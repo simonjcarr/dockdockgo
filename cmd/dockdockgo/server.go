@@ -1,6 +1,7 @@
 package dockdockgo
 
 import (
+	"dockdockgo/internal/api"
 	"dockdockgo/internal/storage"
 	"dockdockgo/pkg/types"
 	"encoding/json"
@@ -112,16 +113,9 @@ var serverListCmd = &cobra.Command{
 	Short: "List cluster servers",
 	Long:  `List all servers in the DockDockGo cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		storage, err := storage.NewDefaultStorage()
+		nodes, err := getNodesList()
 		if err != nil {
-			fmt.Printf("Failed to initialize storage: %v\n", err)
-			return
-		}
-		defer storage.Close()
-
-		nodes, err := storage.ListNodes()
-		if err != nil {
-			fmt.Printf("Failed to list servers: %v\n", err)
+			fmt.Printf("Error: %v\n", err)
 			return
 		}
 
@@ -328,10 +322,37 @@ var clusterInitCmd = &cobra.Command{
 	Long:  `Initialize a new DockDockGo cluster on this node. This node will become the cluster master.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		advertiseAddr, _ := cmd.Flags().GetString("advertise-addr")
-		
+
+		// Try API-first approach
+		client := api.NewClient("localhost", "8080")
+		if client.IsServiceRunning() {
+			fmt.Printf("Using DockDockGo API service...\n")
+
+			response, err := client.ClusterInit(advertiseAddr)
+			if err != nil {
+				fmt.Printf("Failed to initialize cluster via API: %v\n", err)
+				fmt.Printf("Falling back to direct database access...\n")
+			} else {
+				fmt.Printf("✓ Cluster initialized successfully\n")
+				fmt.Printf("  Master Node ID: %s\n", response.NodeID)
+				fmt.Printf("  Hostname: %s\n", response.Hostname)
+				fmt.Printf("  IP Address: %s\n", response.IPAddress)
+				fmt.Printf("  Port: %d\n", response.Port)
+				fmt.Printf("\nTo add workers to this cluster, run on other nodes:\n")
+				fmt.Printf("  %s\n", response.JoinCommand)
+				return
+			}
+		}
+
+		// Fallback to direct database access
+		fmt.Printf("API service not available, using direct database access...\n")
 		storage, err := storage.NewDefaultStorage()
 		if err != nil {
 			fmt.Printf("Failed to initialize storage: %v\n", err)
+			fmt.Printf("\nTroubleshooting:\n")
+			fmt.Printf("- Ensure no other DockDockGo processes are running\n")
+			fmt.Printf("- Check database permissions in /var/lib/dockdockgo/\n")
+			fmt.Printf("- Try stopping the DockDockGo service: sudo systemctl stop dockdockgo\n")
 			return
 		}
 		defer storage.Close()
@@ -401,9 +422,37 @@ var clusterJoinCmd = &cobra.Command{
 		masterAddr := args[0]
 		role, _ := cmd.Flags().GetString("role")
 
+		fmt.Printf("Attempting to join cluster at %s...\n", masterAddr)
+
+		// Try API-first approach
+		client := api.NewClient("localhost", "8080")
+		if client.IsServiceRunning() {
+			fmt.Printf("Using DockDockGo API service...\n")
+
+			response, err := client.ClusterJoin(masterAddr, role)
+			if err != nil {
+				fmt.Printf("Failed to join cluster via API: %v\n", err)
+				fmt.Printf("Falling back to direct database access...\n")
+			} else {
+				fmt.Printf("✓ Successfully joined cluster\n")
+				fmt.Printf("  This Node ID: %s\n", response.NodeID)
+				fmt.Printf("  Role: %s\n", response.Role)
+				fmt.Printf("  Master: %s\n", response.Master)
+				fmt.Printf("  Cluster Nodes: %d\n", response.ClusterNodes)
+				fmt.Printf("\nRun 'dockdockgo server list' to see all cluster nodes.\n")
+				return
+			}
+		}
+
+		// Fallback to direct database access
+		fmt.Printf("API service not available, using direct database access...\n")
 		storage, err := storage.NewDefaultStorage()
 		if err != nil {
 			fmt.Printf("Failed to initialize storage: %v\n", err)
+			fmt.Printf("\nTroubleshooting:\n")
+			fmt.Printf("- Ensure no other DockDockGo processes are running\n")
+			fmt.Printf("- Check database permissions in /var/lib/dockdockgo/\n")
+			fmt.Printf("- Try stopping the DockDockGo service: sudo systemctl stop dockdockgo\n")
 			return
 		}
 		defer storage.Close()
@@ -414,8 +463,6 @@ var clusterJoinCmd = &cobra.Command{
 			fmt.Printf("Failed to get hostname: %v\n", err)
 			return
 		}
-
-		fmt.Printf("Attempting to join cluster at %s...\n", masterAddr)
 
 		// Try to fetch cluster state from master
 		clusterState, err := fetchClusterState(masterAddr)
@@ -461,10 +508,37 @@ var clusterJoinCmd = &cobra.Command{
 	},
 }
 
+func getNodesList() ([]*types.Node, error) {
+	// Try API-first approach
+	client := api.NewClient("localhost", "8080")
+	if client.IsServiceRunning() {
+		nodes, err := client.ListNodes()
+		if err == nil {
+			return nodes, nil
+		}
+		fmt.Printf("Failed to list servers via API: %v\n", err)
+		fmt.Printf("Falling back to direct database access...\n")
+	}
+
+	// Fallback to direct database access
+	storage, err := storage.NewDefaultStorage()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize storage: %v\n\nTroubleshooting:\n- Ensure no other DockDockGo processes are running\n- Check database permissions in /var/lib/dockdockgo/\n- Try stopping the DockDockGo service: sudo systemctl stop dockdockgo", err)
+	}
+	defer storage.Close()
+
+	nodes, err := storage.ListNodes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list servers: %v", err)
+	}
+
+	return nodes, nil
+}
+
 func fetchClusterState(masterAddr string) ([]*types.Node, error) {
 	// Try to fetch cluster state from master node's API
 	url := fmt.Sprintf("http://%s:8080/api/v1/nodes", masterAddr)
-	
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to master API: %w", err)

@@ -8,12 +8,12 @@ import (
 type DeploymentStatus string
 
 const (
-	DeploymentPending   DeploymentStatus = "pending"
-	DeploymentRunning   DeploymentStatus = "running"
-	DeploymentFailed    DeploymentStatus = "failed"
-	DeploymentStopped   DeploymentStatus = "stopped"
-	DeploymentScaling   DeploymentStatus = "scaling"
-	DeploymentUpdating  DeploymentStatus = "updating"
+	DeploymentPending  DeploymentStatus = "pending"
+	DeploymentRunning  DeploymentStatus = "running"
+	DeploymentFailed   DeploymentStatus = "failed"
+	DeploymentStopped  DeploymentStatus = "stopped"
+	DeploymentScaling  DeploymentStatus = "scaling"
+	DeploymentUpdating DeploymentStatus = "updating"
 )
 
 // ContainerStatus represents the current state of a container
@@ -49,41 +49,41 @@ const (
 
 // Deployment represents a named container deployment
 type Deployment struct {
-	ID              string                 `json:"id"`
-	Name            string                 `json:"name"`
-	Image           string                 `json:"image"`
-	Command         []string               `json:"command,omitempty"`
-	Entrypoint      []string               `json:"entrypoint,omitempty"`
-	Environment     map[string]string      `json:"environment,omitempty"`
-	Ports           []PortMapping          `json:"ports,omitempty"`
-	Volumes         []VolumeMapping        `json:"volumes,omitempty"`
-	Replicas        int                    `json:"replicas"`
-	Placement       *PlacementConfig       `json:"placement,omitempty"`
-	HealthCheck     *HealthCheckConfig     `json:"health_check,omitempty"`
-	RestartPolicy   string                 `json:"restart_policy"`
-	Status          DeploymentStatus       `json:"status"`
-	Containers      map[string]*Container  `json:"containers"`
-	CreatedAt       time.Time              `json:"created_at"`
-	UpdatedAt       time.Time              `json:"updated_at"`
-	CreatedBy       string                 `json:"created_by"`
+	ID            string                `json:"id"`
+	Name          string                `json:"name"`
+	Image         string                `json:"image"`
+	Command       []string              `json:"command,omitempty"`
+	Entrypoint    []string              `json:"entrypoint,omitempty"`
+	Environment   map[string]string     `json:"environment,omitempty"`
+	Ports         []PortMapping         `json:"ports,omitempty"`
+	Volumes       []VolumeMapping       `json:"volumes,omitempty"`
+	Replicas      int                   `json:"replicas"`
+	Placement     *PlacementConfig      `json:"placement,omitempty"`
+	HealthCheck   *HealthCheckConfig    `json:"health_check,omitempty"`
+	RestartPolicy string                `json:"restart_policy"`
+	Status        DeploymentStatus      `json:"status"`
+	Containers    map[string]*Container `json:"containers"`
+	CreatedAt     time.Time             `json:"created_at"`
+	UpdatedAt     time.Time             `json:"updated_at"`
+	CreatedBy     string                `json:"created_by"`
 }
 
 // Container represents a running container instance
 type Container struct {
-	ID             string           `json:"id"`
-	Name           string           `json:"name"`
-	DeploymentID   string           `json:"deployment_id"`
-	NodeID         string           `json:"node_id"`
-	DockerID       string           `json:"docker_id"`
-	Status         ContainerStatus  `json:"status"`
-	Health         HealthStatus     `json:"health"`
-	ExitCode       *int             `json:"exit_code,omitempty"`
-	RestartCount   int              `json:"restart_count"`
-	StartedAt      *time.Time       `json:"started_at,omitempty"`
-	FinishedAt     *time.Time       `json:"finished_at,omitempty"`
-	LastHeartbeat  time.Time        `json:"last_heartbeat"`
-	Resources      *ResourceUsage   `json:"resources,omitempty"`
-	Ports          []PortMapping    `json:"ports,omitempty"`
+	ID            string          `json:"id"`
+	Name          string          `json:"name"`
+	DeploymentID  string          `json:"deployment_id"`
+	NodeID        string          `json:"node_id"`
+	DockerID      string          `json:"docker_id"`
+	Status        ContainerStatus `json:"status"`
+	Health        HealthStatus    `json:"health"`
+	ExitCode      *int            `json:"exit_code,omitempty"`
+	RestartCount  int             `json:"restart_count"`
+	StartedAt     *time.Time      `json:"started_at,omitempty"`
+	FinishedAt    *time.Time      `json:"finished_at,omitempty"`
+	LastHeartbeat time.Time       `json:"last_heartbeat"`
+	Resources     *ResourceUsage  `json:"resources,omitempty"`
+	Ports         []PortMapping   `json:"ports,omitempty"`
 }
 
 // Node represents a cluster member
@@ -136,9 +136,9 @@ type HealthCheckConfig struct {
 
 // HTTPHealthCheck defines HTTP-based health checking
 type HTTPHealthCheck struct {
-	Path   string            `json:"path"`
-	Port   int               `json:"port"`
-	Scheme string            `json:"scheme"` // http, https
+	Path    string            `json:"path"`
+	Port    int               `json:"port"`
+	Scheme  string            `json:"scheme"` // http, https
 	Headers map[string]string `json:"headers,omitempty"`
 }
 
@@ -177,31 +177,31 @@ type NodeResources struct {
 
 // ContainerEvent represents a container state change
 type ContainerEvent struct {
-	ContainerID   string          `json:"container_id"`
-	DeploymentID  string          `json:"deployment_id"`
-	NodeID        string          `json:"node_id"`
-	EventType     string          `json:"event_type"` // start, stop, die, restart
-	OldStatus     ContainerStatus `json:"old_status"`
-	NewStatus     ContainerStatus `json:"new_status"`
-	Timestamp     time.Time       `json:"timestamp"`
-	ExitCode      *int            `json:"exit_code,omitempty"`
-	Reason        string          `json:"reason,omitempty"`
-	RestartCount  int             `json:"restart_count"`
+	ContainerID  string          `json:"container_id"`
+	DeploymentID string          `json:"deployment_id"`
+	NodeID       string          `json:"node_id"`
+	EventType    string          `json:"event_type"` // start, stop, die, restart
+	OldStatus    ContainerStatus `json:"old_status"`
+	NewStatus    ContainerStatus `json:"new_status"`
+	Timestamp    time.Time       `json:"timestamp"`
+	ExitCode     *int            `json:"exit_code,omitempty"`
+	Reason       string          `json:"reason,omitempty"`
+	RestartCount int             `json:"restart_count"`
 }
 
 // DeploymentSpec represents the desired state for deployment creation
 type DeploymentSpec struct {
-	Name          string                `json:"name"`
-	Image         string                `json:"image"`
-	Command       []string              `json:"command,omitempty"`
-	Entrypoint    []string              `json:"entrypoint,omitempty"`
-	Environment   map[string]string     `json:"environment,omitempty"`
-	Ports         []PortMapping         `json:"ports,omitempty"`
-	Volumes       []VolumeMapping       `json:"volumes,omitempty"`
-	Replicas      int                   `json:"replicas"`
-	Placement     *PlacementConfig      `json:"placement,omitempty"`
-	HealthCheck   *HealthCheckConfig    `json:"health_check,omitempty"`
-	RestartPolicy string                `json:"restart_policy"`
+	Name          string             `json:"name"`
+	Image         string             `json:"image"`
+	Command       []string           `json:"command,omitempty"`
+	Entrypoint    []string           `json:"entrypoint,omitempty"`
+	Environment   map[string]string  `json:"environment,omitempty"`
+	Ports         []PortMapping      `json:"ports,omitempty"`
+	Volumes       []VolumeMapping    `json:"volumes,omitempty"`
+	Replicas      int                `json:"replicas"`
+	Placement     *PlacementConfig   `json:"placement,omitempty"`
+	HealthCheck   *HealthCheckConfig `json:"health_check,omitempty"`
+	RestartPolicy string             `json:"restart_policy"`
 }
 
 // ClusterState represents the overall cluster state

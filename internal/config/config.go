@@ -19,14 +19,14 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host        string `yaml:"host"`
-	Port        string `yaml:"port"`
-	User        string `yaml:"user"`
-	KeyPath     string `yaml:"key_path"`
-	Password    string `yaml:"password"`
-	DockerHost  string `yaml:"docker_host"`
+	Host        string            `yaml:"host"`
+	Port        string            `yaml:"port"`
+	User        string            `yaml:"user"`
+	KeyPath     string            `yaml:"key_path"`
+	Password    string            `yaml:"password"`
+	DockerHost  string            `yaml:"docker_host"`
 	Labels      map[string]string `yaml:"labels"`
-	MaxReplicas int    `yaml:"max_replicas"`
+	MaxReplicas int               `yaml:"max_replicas"`
 }
 
 type DefaultConfig struct {
@@ -56,8 +56,8 @@ type ClusterConfig struct {
 }
 
 type RegistryConfig struct {
-	DefaultRegistry string                     `yaml:"default_registry"`
-	Registries      map[string]*RegistryInfo   `yaml:"registries"`
+	DefaultRegistry string                   `yaml:"default_registry"`
+	Registries      map[string]*RegistryInfo `yaml:"registries"`
 }
 
 type RegistryInfo struct {

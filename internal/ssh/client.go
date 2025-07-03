@@ -103,7 +103,7 @@ func (c *Client) Execute(command string) (string, error) {
 	// Set a timeout for long-running commands
 	done := make(chan error, 1)
 	var output []byte
-	
+
 	go func() {
 		output, err = session.CombinedOutput(command)
 		done <- err

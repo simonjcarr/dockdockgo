@@ -57,7 +57,7 @@ docker run options and can deploy to multiple remote servers.`,
 
 func init() {
 	rootCmd.AddCommand(runCmd)
-	
+
 	runCmd.Flags().StringSliceP("servers", "s", []string{}, "List of remote servers to deploy to")
 	runCmd.Flags().IntP("replicas", "r", 1, "Number of replicas to run")
 	runCmd.Flags().StringSliceP("port", "p", []string{}, "Port mappings (host:container)")

@@ -28,7 +28,7 @@ func NewStorage(dbPath string) (*Storage, error) {
 	}
 
 	storage := &Storage{db: db}
-	
+
 	// Create buckets if they don't exist
 	if err := storage.initBuckets(); err != nil {
 		return nil, fmt.Errorf("failed to initialize buckets: %w", err)
@@ -65,7 +65,7 @@ func (s *Storage) Close() error {
 func (s *Storage) SaveDeployment(deployment *types.Deployment) error {
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(DeploymentsBucket))
-		
+
 		deployment.UpdatedAt = time.Now()
 		data, err := json.Marshal(deployment)
 		if err != nil {
@@ -78,11 +78,11 @@ func (s *Storage) SaveDeployment(deployment *types.Deployment) error {
 
 func (s *Storage) GetDeployment(id string) (*types.Deployment, error) {
 	var deployment *types.Deployment
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(DeploymentsBucket))
 		data := bucket.Get([]byte(id))
-		
+
 		if data == nil {
 			return fmt.Errorf("deployment %s not found", id)
 		}
@@ -100,7 +100,7 @@ func (s *Storage) GetDeployment(id string) (*types.Deployment, error) {
 
 func (s *Storage) GetDeploymentByName(name string) (*types.Deployment, error) {
 	var deployment *types.Deployment
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(DeploymentsBucket))
 		cursor := bucket.Cursor()
@@ -110,7 +110,7 @@ func (s *Storage) GetDeploymentByName(name string) (*types.Deployment, error) {
 			if err := json.Unmarshal(v, &dep); err != nil {
 				continue
 			}
-			
+
 			if dep.Name == name {
 				deployment = &dep
 				return nil
@@ -125,7 +125,7 @@ func (s *Storage) GetDeploymentByName(name string) (*types.Deployment, error) {
 
 func (s *Storage) ListDeployments() ([]*types.Deployment, error) {
 	var deployments []*types.Deployment
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(DeploymentsBucket))
 		cursor := bucket.Cursor()
@@ -155,7 +155,7 @@ func (s *Storage) DeleteDeployment(id string) error {
 func (s *Storage) SaveContainer(container *types.Container) error {
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(ContainersBucket))
-		
+
 		data, err := json.Marshal(container)
 		if err != nil {
 			return fmt.Errorf("failed to marshal container: %w", err)
@@ -167,11 +167,11 @@ func (s *Storage) SaveContainer(container *types.Container) error {
 
 func (s *Storage) GetContainer(id string) (*types.Container, error) {
 	var container *types.Container
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(ContainersBucket))
 		data := bucket.Get([]byte(id))
-		
+
 		if data == nil {
 			return fmt.Errorf("container %s not found", id)
 		}
@@ -189,7 +189,7 @@ func (s *Storage) GetContainer(id string) (*types.Container, error) {
 
 func (s *Storage) ListContainers() ([]*types.Container, error) {
 	var containers []*types.Container
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(ContainersBucket))
 		cursor := bucket.Cursor()
@@ -210,7 +210,7 @@ func (s *Storage) ListContainers() ([]*types.Container, error) {
 
 func (s *Storage) ListContainersByDeployment(deploymentID string) ([]*types.Container, error) {
 	var containers []*types.Container
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(ContainersBucket))
 		cursor := bucket.Cursor()
@@ -220,7 +220,7 @@ func (s *Storage) ListContainersByDeployment(deploymentID string) ([]*types.Cont
 			if err := json.Unmarshal(v, &container); err != nil {
 				continue
 			}
-			
+
 			if container.DeploymentID == deploymentID {
 				containers = append(containers, &container)
 			}
@@ -234,7 +234,7 @@ func (s *Storage) ListContainersByDeployment(deploymentID string) ([]*types.Cont
 
 func (s *Storage) ListContainersByNode(nodeID string) ([]*types.Container, error) {
 	var containers []*types.Container
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(ContainersBucket))
 		cursor := bucket.Cursor()
@@ -244,7 +244,7 @@ func (s *Storage) ListContainersByNode(nodeID string) ([]*types.Container, error
 			if err := json.Unmarshal(v, &container); err != nil {
 				continue
 			}
-			
+
 			if container.NodeID == nodeID {
 				containers = append(containers, &container)
 			}
@@ -267,7 +267,7 @@ func (s *Storage) DeleteContainer(id string) error {
 func (s *Storage) SaveNode(node *types.Node) error {
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(NodesBucket))
-		
+
 		data, err := json.Marshal(node)
 		if err != nil {
 			return fmt.Errorf("failed to marshal node: %w", err)
@@ -279,11 +279,11 @@ func (s *Storage) SaveNode(node *types.Node) error {
 
 func (s *Storage) GetNode(id string) (*types.Node, error) {
 	var node *types.Node
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(NodesBucket))
 		data := bucket.Get([]byte(id))
-		
+
 		if data == nil {
 			return fmt.Errorf("node %s not found", id)
 		}
@@ -301,7 +301,7 @@ func (s *Storage) GetNode(id string) (*types.Node, error) {
 
 func (s *Storage) ListNodes() ([]*types.Node, error) {
 	var nodes []*types.Node
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(NodesBucket))
 		cursor := bucket.Cursor()
@@ -331,7 +331,7 @@ func (s *Storage) DeleteNode(id string) error {
 func (s *Storage) SaveClusterState(state *types.ClusterState) error {
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(ClusterBucket))
-		
+
 		state.UpdatedAt = time.Now()
 		data, err := json.Marshal(state)
 		if err != nil {
@@ -344,18 +344,18 @@ func (s *Storage) SaveClusterState(state *types.ClusterState) error {
 
 func (s *Storage) GetClusterState() (*types.ClusterState, error) {
 	var state *types.ClusterState
-	
+
 	err := s.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(ClusterBucket))
 		data := bucket.Get([]byte("current"))
-		
+
 		if data == nil {
 			// Return empty state if not found
 			state = &types.ClusterState{
-				Deployments:  make(map[string]*types.Deployment),
-				Containers:   make(map[string]*types.Container),
-				Nodes:        make(map[string]*types.Node),
-				UpdatedAt:    time.Now(),
+				Deployments: make(map[string]*types.Deployment),
+				Containers:  make(map[string]*types.Container),
+				Nodes:       make(map[string]*types.Node),
+				UpdatedAt:   time.Now(),
 			}
 			return nil
 		}

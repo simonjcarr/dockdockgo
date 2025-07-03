@@ -229,7 +229,7 @@ func (dm *DeploymentManager) createContainer(deployment *types.Deployment, index
 	// Adjust ports for multiple replicas
 	ports := make([]types.PortMapping, len(deployment.Ports))
 	copy(ports, deployment.Ports)
-	
+
 	for i := range ports {
 		if deployment.Replicas > 1 && ports[i].HostPort > 0 {
 			ports[i].HostPort = ports[i].HostPort + index
@@ -270,7 +270,7 @@ func (dm *DeploymentManager) removeContainers(deployment *types.Deployment, coun
 	// Remove containers (starting from the end)
 	for i := len(runningContainers) - count; i < len(runningContainers); i++ {
 		container := runningContainers[i]
-		
+
 		if err := dm.stopContainer(container); err != nil {
 			return fmt.Errorf("failed to stop container %s: %w", container.ID, err)
 		}
@@ -288,11 +288,11 @@ func (dm *DeploymentManager) removeContainers(deployment *types.Deployment, coun
 func (dm *DeploymentManager) stopContainer(container *types.Container) error {
 	// TODO: Send container stop command to worker node via gRPC
 	fmt.Printf("Stopping container %s on node %s\n", container.Name, container.NodeID)
-	
+
 	container.Status = types.ContainerStopped
 	now := time.Now()
 	container.FinishedAt = &now
-	
+
 	return dm.storage.SaveContainer(container)
 }
 
@@ -305,11 +305,11 @@ func (dm *DeploymentManager) UpdateContainerStatus(containerID string, event *ty
 	// Update container status
 	container.Status = event.NewStatus
 	container.LastHeartbeat = event.Timestamp
-	
+
 	if event.ExitCode != nil {
 		container.ExitCode = event.ExitCode
 	}
-	
+
 	if event.EventType == "restart" {
 		container.RestartCount = event.RestartCount
 	}
@@ -346,7 +346,7 @@ func (dm *DeploymentManager) updateDeploymentStatus(deploymentID string) error {
 
 	runningCount := 0
 	failedCount := 0
-	
+
 	for _, container := range containers {
 		switch container.Status {
 		case types.ContainerRunning:

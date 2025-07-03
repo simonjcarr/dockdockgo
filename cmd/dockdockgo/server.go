@@ -26,17 +26,17 @@ var serverAddCmd = &cobra.Command{
 		port, _ := cmd.Flags().GetInt("port")
 		role, _ := cmd.Flags().GetString("role")
 		labels, _ := cmd.Flags().GetStringSlice("label")
-		
+
 		storage, err := storage.NewDefaultStorage()
 		if err != nil {
 			fmt.Printf("Failed to initialize storage: %v\n", err)
 			return
 		}
 		defer storage.Close()
-		
+
 		// Parse labels
 		nodeLabels := parseLabels(labels)
-		
+
 		for _, hostname := range args {
 			node := &types.Node{
 				ID:            uuid.New().String(),
@@ -50,17 +50,17 @@ var serverAddCmd = &cobra.Command{
 				LastHeartbeat: time.Now(),
 				JoinedAt:      time.Now(),
 			}
-			
+
 			if err := storage.SaveNode(node); err != nil {
 				fmt.Printf("Failed to add server %s: %v\n", hostname, err)
 				continue
 			}
-			
+
 			fmt.Printf("✓ Server %s added to cluster\n", hostname)
 			fmt.Printf("  ID: %s\n", node.ID)
 			fmt.Printf("  Role: %s\n", node.Role)
 			fmt.Printf("  Port: %d\n", node.Port)
-			
+
 			// TODO: Connect to server and install DockDockGo agent
 			fmt.Printf("  Status: %s (pending agent installation)\n", node.Status)
 		}
@@ -78,21 +78,21 @@ var serverListCmd = &cobra.Command{
 			return
 		}
 		defer storage.Close()
-		
+
 		nodes, err := storage.ListNodes()
 		if err != nil {
 			fmt.Printf("Failed to list servers: %v\n", err)
 			return
 		}
-		
+
 		if len(nodes) == 0 {
 			fmt.Println("No servers found")
 			return
 		}
-		
+
 		fmt.Printf("%-20s %-15s %-10s %-10s %-15s %-10s\n", "HOSTNAME", "IP", "PORT", "ROLE", "STATUS", "AGE")
 		fmt.Println("--------------------------------------------------------------------------------")
-		
+
 		for _, node := range nodes {
 			age := formatAge(node.JoinedAt)
 			fmt.Printf("%-20s %-15s %-10d %-10s %-15s %-10s\n",
@@ -113,14 +113,14 @@ var serverRemoveCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		force, _ := cmd.Flags().GetBool("force")
-		
+
 		storage, err := storage.NewDefaultStorage()
 		if err != nil {
 			fmt.Printf("Failed to initialize storage: %v\n", err)
 			return
 		}
 		defer storage.Close()
-		
+
 		for _, hostname := range args {
 			// Find node by hostname
 			nodes, err := storage.ListNodes()
@@ -128,7 +128,7 @@ var serverRemoveCmd = &cobra.Command{
 				fmt.Printf("Failed to list servers: %v\n", err)
 				continue
 			}
-			
+
 			var nodeToRemove *types.Node
 			for _, node := range nodes {
 				if node.Hostname == hostname {
@@ -136,39 +136,39 @@ var serverRemoveCmd = &cobra.Command{
 					break
 				}
 			}
-			
+
 			if nodeToRemove == nil {
 				fmt.Printf("Server %s not found\n", hostname)
 				continue
 			}
-			
+
 			// Check if server has running containers
 			containers, err := storage.ListContainersByNode(nodeToRemove.ID)
 			if err != nil {
 				fmt.Printf("Failed to check containers on server %s: %v\n", hostname, err)
 				continue
 			}
-			
+
 			runningContainers := 0
 			for _, container := range containers {
 				if container.Status == types.ContainerRunning {
 					runningContainers++
 				}
 			}
-			
+
 			if runningContainers > 0 && !force {
 				fmt.Printf("Server %s has %d running containers. Use --force to remove anyway.\n", hostname, runningContainers)
 				continue
 			}
-			
+
 			// Remove the node
 			if err := storage.DeleteNode(nodeToRemove.ID); err != nil {
 				fmt.Printf("Failed to remove server %s: %v\n", hostname, err)
 				continue
 			}
-			
+
 			fmt.Printf("✓ Server %s removed from cluster\n", hostname)
-			
+
 			if runningContainers > 0 {
 				fmt.Printf("  Warning: %d containers were running on this server\n", runningContainers)
 			}
@@ -183,21 +183,21 @@ var serverStatusCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		hostname := args[0]
-		
+
 		storage, err := storage.NewDefaultStorage()
 		if err != nil {
 			fmt.Printf("Failed to initialize storage: %v\n", err)
 			return
 		}
 		defer storage.Close()
-		
+
 		// Find node by hostname
 		nodes, err := storage.ListNodes()
 		if err != nil {
 			fmt.Printf("Failed to list servers: %v\n", err)
 			return
 		}
-		
+
 		var node *types.Node
 		for _, n := range nodes {
 			if n.Hostname == hostname {
@@ -205,19 +205,19 @@ var serverStatusCmd = &cobra.Command{
 				break
 			}
 		}
-		
+
 		if node == nil {
 			fmt.Printf("Server %s not found\n", hostname)
 			return
 		}
-		
+
 		// Get containers on this node
 		containers, err := storage.ListContainersByNode(node.ID)
 		if err != nil {
 			fmt.Printf("Failed to list containers: %v\n", err)
 			return
 		}
-		
+
 		// Display server info
 		fmt.Printf("Server: %s\n", node.Hostname)
 		fmt.Printf("ID: %s\n", node.ID)
@@ -228,20 +228,20 @@ var serverStatusCmd = &cobra.Command{
 		fmt.Printf("Version: %s\n", node.Version)
 		fmt.Printf("Joined: %s\n", node.JoinedAt.Format("2006-01-02 15:04:05"))
 		fmt.Printf("Last Heartbeat: %s\n", node.LastHeartbeat.Format("2006-01-02 15:04:05"))
-		
+
 		if len(node.Labels) > 0 {
 			fmt.Printf("Labels:\n")
 			for key, value := range node.Labels {
 				fmt.Printf("  %s=%s\n", key, value)
 			}
 		}
-		
+
 		if node.Resources != nil {
 			fmt.Printf("Resources:\n")
 			fmt.Printf("  CPU Cores: %d\n", node.Resources.CPUCores)
 			fmt.Printf("  CPU Usage: %.1f%%\n", node.Resources.CPUUsagePercent)
-			fmt.Printf("  Memory: %d/%d MB (%.1f%%)\n", 
-				node.Resources.MemoryUsageMB, 
+			fmt.Printf("  Memory: %d/%d MB (%.1f%%)\n",
+				node.Resources.MemoryUsageMB,
 				node.Resources.MemoryTotalMB,
 				float64(node.Resources.MemoryUsageMB)/float64(node.Resources.MemoryTotalMB)*100)
 			fmt.Printf("  Disk: %d/%d GB (%.1f%%)\n",
@@ -250,19 +250,19 @@ var serverStatusCmd = &cobra.Command{
 				float64(node.Resources.DiskUsageGB)/float64(node.Resources.DiskTotalGB)*100)
 			fmt.Printf("  Containers: %d/%d\n", node.Resources.ContainerCount, node.Resources.MaxContainers)
 		}
-		
+
 		// Display container info
 		if len(containers) > 0 {
 			fmt.Printf("\nContainers (%d):\n", len(containers))
 			fmt.Printf("%-20s %-20s %-15s %-15s\n", "NAME", "DEPLOYMENT", "STATUS", "STARTED")
 			fmt.Println("------------------------------------------------------------------------")
-			
+
 			for _, container := range containers {
 				startedStr := "N/A"
 				if container.StartedAt != nil {
 					startedStr = formatAge(*container.StartedAt)
 				}
-				
+
 				fmt.Printf("%-20s %-20s %-15s %-15s\n",
 					container.Name,
 					container.DeploymentID,
@@ -277,7 +277,7 @@ var serverStatusCmd = &cobra.Command{
 
 func parseLabels(labels []string) map[string]string {
 	labelMap := make(map[string]string)
-	
+
 	for _, label := range labels {
 		parts := strings.SplitN(label, "=", 2)
 		if len(parts) == 2 {
@@ -286,13 +286,13 @@ func parseLabels(labels []string) map[string]string {
 			labelMap[parts[0]] = ""
 		}
 	}
-	
+
 	return labelMap
 }
 
 func formatAge(t time.Time) string {
 	duration := time.Since(t)
-	
+
 	if duration < time.Minute {
 		return fmt.Sprintf("%ds", int(duration.Seconds()))
 	} else if duration < time.Hour {
@@ -310,12 +310,12 @@ func init() {
 	serverCmd.AddCommand(serverListCmd)
 	serverCmd.AddCommand(serverRemoveCmd)
 	serverCmd.AddCommand(serverStatusCmd)
-	
+
 	// Server add flags
 	serverAddCmd.Flags().IntP("port", "p", 8443, "gRPC port for cluster communication")
 	serverAddCmd.Flags().StringP("role", "r", "worker", "Server role (master, worker)")
 	serverAddCmd.Flags().StringSliceP("label", "l", []string{}, "Server labels (key=value)")
-	
+
 	// Server remove flags
 	serverRemoveCmd.Flags().BoolP("force", "f", false, "Force removal even with running containers")
 }

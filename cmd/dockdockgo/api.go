@@ -20,7 +20,7 @@ var apiStartCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		port, _ := cmd.Flags().GetString("port")
 		host, _ := cmd.Flags().GetString("host")
-		
+
 		server := api.NewServer(host, port)
 		if err := server.Start(); err != nil {
 			fmt.Printf("Failed to start API server: %v\n", err)
@@ -41,7 +41,7 @@ func init() {
 	rootCmd.AddCommand(apiCmd)
 	apiCmd.AddCommand(apiStartCmd)
 	apiCmd.AddCommand(apiTokenCmd)
-	
+
 	apiStartCmd.Flags().StringP("port", "p", "8080", "Port to listen on")
 	apiStartCmd.Flags().StringP("host", "H", "0.0.0.0", "Host to bind to")
 	apiStartCmd.Flags().BoolP("tls", "t", false, "Enable TLS")

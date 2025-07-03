@@ -19,7 +19,7 @@ Defaults to DockerHub if no registry is specified.`,
 		registry, _ := cmd.Flags().GetString("registry")
 		local, _ := cmd.Flags().GetBool("local")
 		limit, _ := cmd.Flags().GetInt("limit")
-		
+
 		if local {
 			if err := searchLocalImages(searchTerm); err != nil {
 				fmt.Printf("Failed to search local images: %v\n", err)
@@ -39,7 +39,7 @@ Defaults to DockerHub if no registry is specified.`,
 
 func init() {
 	rootCmd.AddCommand(searchCmd)
-	
+
 	searchCmd.Flags().StringP("registry", "r", "", "Registry to search (defaults to DockerHub)")
 	searchCmd.Flags().BoolP("local", "l", false, "Search local images only")
 	searchCmd.Flags().IntP("limit", "", 25, "Limit number of results")

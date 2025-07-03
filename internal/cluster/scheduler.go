@@ -131,20 +131,20 @@ func (s *Scheduler) evaluateConstraint(node *types.Node, constraint string) bool
 		if len(parts) != 2 {
 			return false
 		}
-		
+
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-		
+
 		return s.getNodeProperty(node, key) == value
 	} else if strings.Contains(constraint, "!=") {
 		parts := strings.Split(constraint, "!=")
 		if len(parts) != 2 {
 			return false
 		}
-		
+
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-		
+
 		return s.getNodeProperty(node, key) != value
 	}
 
@@ -170,10 +170,10 @@ func (s *Scheduler) getNodeProperty(node *types.Node, property string) string {
 func (s *Scheduler) scheduleSpread(nodes []*types.Node, container *types.Container) *types.Node {
 	// Get container counts per node
 	containerCounts := s.getContainerCountsPerNode()
-	
+
 	var bestNode *types.Node
 	minContainers := math.MaxInt32
-	
+
 	for _, node := range nodes {
 		if s.hasCapacity(node, container) {
 			count := containerCounts[node.ID]
@@ -183,7 +183,7 @@ func (s *Scheduler) scheduleSpread(nodes []*types.Node, container *types.Contain
 			}
 		}
 	}
-	
+
 	return bestNode
 }
 
@@ -191,10 +191,10 @@ func (s *Scheduler) scheduleSpread(nodes []*types.Node, container *types.Contain
 func (s *Scheduler) schedulePack(nodes []*types.Node, container *types.Container) *types.Node {
 	// Get container counts per node
 	containerCounts := s.getContainerCountsPerNode()
-	
+
 	var bestNode *types.Node
 	maxContainers := -1
-	
+
 	for _, node := range nodes {
 		if s.hasCapacity(node, container) {
 			count := containerCounts[node.ID]
@@ -204,7 +204,7 @@ func (s *Scheduler) schedulePack(nodes []*types.Node, container *types.Container
 			}
 		}
 	}
-	
+
 	return bestNode
 }
 
@@ -212,7 +212,7 @@ func (s *Scheduler) schedulePack(nodes []*types.Node, container *types.Container
 func (s *Scheduler) scheduleBinPack(nodes []*types.Node, container *types.Container) *types.Node {
 	var bestNode *types.Node
 	bestScore := float64(-1)
-	
+
 	for _, node := range nodes {
 		if s.hasCapacity(node, container) {
 			score := s.calculateBinPackScore(node, container)
@@ -222,7 +222,7 @@ func (s *Scheduler) scheduleBinPack(nodes []*types.Node, container *types.Contai
 			}
 		}
 	}
-	
+
 	return bestNode
 }
 
@@ -230,11 +230,11 @@ func (s *Scheduler) calculateBinPackScore(node *types.Node, container *types.Con
 	if node.Resources == nil {
 		return 0.5 // neutral score if no resource info
 	}
-	
+
 	// Calculate resource utilization (higher is better for bin packing)
 	cpuUtil := node.Resources.CPUUsagePercent / 100.0
 	memUtil := float64(node.Resources.MemoryUsageMB) / float64(node.Resources.MemoryTotalMB)
-	
+
 	// Combine CPU and memory utilization
 	return (cpuUtil + memUtil) / 2.0
 }
@@ -243,28 +243,28 @@ func (s *Scheduler) hasCapacity(node *types.Node, container *types.Container) bo
 	if node.Resources == nil {
 		return true // assume capacity if no resource info
 	}
-	
+
 	// Check container count limit
 	if node.Resources.ContainerCount >= node.Resources.MaxContainers {
 		return false
 	}
-	
+
 	// Check CPU usage (don't schedule if > 90% used)
 	if node.Resources.CPUUsagePercent > 90.0 {
 		return false
 	}
-	
+
 	// Check memory usage (don't schedule if > 90% used)
 	memoryUsagePercent := float64(node.Resources.MemoryUsageMB) / float64(node.Resources.MemoryTotalMB) * 100.0
 	if memoryUsagePercent > 90.0 {
 		return false
 	}
-	
+
 	// Check port conflicts
 	if s.hasPortConflicts(node, container.Ports) {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -274,7 +274,7 @@ func (s *Scheduler) hasPortConflicts(node *types.Node, ports []types.PortMapping
 	if err != nil {
 		return false // assume no conflicts if we can't check
 	}
-	
+
 	// Build map of used ports
 	usedPorts := make(map[int]bool)
 	for _, container := range containers {
@@ -286,30 +286,30 @@ func (s *Scheduler) hasPortConflicts(node *types.Node, ports []types.PortMapping
 			}
 		}
 	}
-	
+
 	// Check for conflicts
 	for _, port := range ports {
 		if port.HostPort > 0 && usedPorts[port.HostPort] {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 func (s *Scheduler) getContainerCountsPerNode() map[string]int {
 	counts := make(map[string]int)
-	
+
 	containers, err := s.storage.ListContainers()
 	if err != nil {
 		return counts
 	}
-	
+
 	for _, container := range containers {
 		if container.Status == types.ContainerRunning || container.Status == types.ContainerPending {
 			counts[container.NodeID]++
 		}
 	}
-	
+
 	return counts
 }

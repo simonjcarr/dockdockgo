@@ -36,13 +36,13 @@ func IsProduction() bool {
 // getProductionDatabasePath returns the FHS-compliant production database path
 func getProductionDatabasePath() string {
 	dbDir := "/var/lib/dockdockgo"
-	
+
 	// Ensure directory exists
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
 		// Fallback to current directory if we can't create /var/lib/dockdockgo
 		return "./dockdockgo.db"
 	}
-	
+
 	return filepath.Join(dbDir, "dockdockgo.db")
 }
 

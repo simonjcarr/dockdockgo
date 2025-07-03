@@ -41,13 +41,21 @@ This project uses **fully automated semantic versioning** and **professional CI/
 - **feature branches**: Individual features/fixes (`feat/new-feature`, `fix/bug-name`)
 
 ### Feature Branch Workflow
-**ALWAYS create feature branches for ANY changes - never commit directly to develop or main:**
+**MANDATORY: ALWAYS create feature branches for ANY changes - never commit directly to develop or main:**
+
+⚠️ **CRITICAL RULE**: Before making ANY code changes, file edits, or additions, you MUST first create a feature branch. This includes:
+- Creating new files
+- Editing existing files
+- Adding documentation
+- Making configuration changes
+- ANY modification to the codebase
 
 1. **Create focused feature branches** for small, related chunks of work:
    ```bash
    git checkout -b feat/descriptive-feature-name  # for new features
    git checkout -b fix/descriptive-fix-name       # for bug fixes
    git checkout -b docs/descriptive-doc-name      # for documentation
+   git checkout -b chore/descriptive-task-name    # for maintenance tasks
    ```
 
 2. **Keep feature branches small and focused** - one logical change per branch:

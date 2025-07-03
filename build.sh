@@ -38,15 +38,20 @@ mkdir -p "$BUILD_DIR"
 VERSION=$(git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo "")
 
 if [ -z "$VERSION" ]; then
-    # If no tags, check if we're on a known branch
+    # If no tags, use semantic versioning based on branch
     BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    COMMIT_COUNT=$(git rev-list --count HEAD 2>/dev/null || echo "0")
+    COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    
     if [ "$BRANCH" = "main" ]; then
         VERSION="1.0.0-dev"
     elif [ "$BRANCH" = "develop" ]; then
-        COMMIT_COUNT=$(git rev-list --count HEAD 2>/dev/null || echo "0")
-        VERSION="0.$(date +%Y%m%d).${COMMIT_COUNT}-dev"
+        # Use 0.x.y format for development
+        MINOR=$((COMMIT_COUNT / 10))  # Increment minor every 10 commits
+        PATCH=$((COMMIT_COUNT % 10))  # Patch is remainder
+        VERSION="0.${MINOR}.${PATCH}-dev"
     else
-        VERSION="dev-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+        VERSION="0.0.0-dev-${COMMIT_SHORT}"
     fi
 else
     # Clean up git describe output (remove 'v' prefix if present)

@@ -3,7 +3,11 @@ package dockdockgo
 import (
 	"dockdockgo/internal/storage"
 	"dockdockgo/pkg/types"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -37,32 +41,68 @@ var serverAddCmd = &cobra.Command{
 		// Parse labels
 		nodeLabels := parseLabels(labels)
 
+		// Get existing nodes to check for duplicates
+		existingNodes, err := storage.ListNodes()
+		if err != nil {
+			fmt.Printf("Failed to list existing nodes: %v\n", err)
+			return
+		}
+
 		for _, hostname := range args {
-			node := &types.Node{
-				ID:            uuid.New().String(),
-				Hostname:      hostname,
-				IPAddress:     hostname, // TODO: Resolve IP address
-				Port:          port,
-				Status:        types.NodeOffline,
-				Role:          role,
-				Version:       "1.0.0", // TODO: Get actual version
-				Labels:        nodeLabels,
-				LastHeartbeat: time.Now(),
-				JoinedAt:      time.Now(),
+			// Check if server already exists
+			var existingNode *types.Node
+			for _, node := range existingNodes {
+				if node.Hostname == hostname || node.IPAddress == hostname {
+					existingNode = node
+					break
+				}
 			}
 
-			if err := storage.SaveNode(node); err != nil {
-				fmt.Printf("Failed to add server %s: %v\n", hostname, err)
-				continue
+			if existingNode != nil {
+				// Update existing node
+				existingNode.Role = role
+				existingNode.Port = port
+				existingNode.Labels = nodeLabels
+				existingNode.LastHeartbeat = time.Now()
+
+				if err := storage.SaveNode(existingNode); err != nil {
+					fmt.Printf("Failed to update server %s: %v\n", hostname, err)
+					continue
+				}
+
+				fmt.Printf("✓ Server %s updated in cluster\n", hostname)
+				fmt.Printf("  ID: %s\n", existingNode.ID)
+				fmt.Printf("  Role: %s (updated)\n", existingNode.Role)
+				fmt.Printf("  Port: %d (updated)\n", existingNode.Port)
+				fmt.Printf("  Status: %s\n", existingNode.Status)
+			} else {
+				// Create new node
+				node := &types.Node{
+					ID:            uuid.New().String(),
+					Hostname:      hostname,
+					IPAddress:     hostname, // TODO: Resolve IP address
+					Port:          port,
+					Status:        types.NodeOffline,
+					Role:          role,
+					Version:       "1.0.0", // TODO: Get actual version
+					Labels:        nodeLabels,
+					LastHeartbeat: time.Now(),
+					JoinedAt:      time.Now(),
+				}
+
+				if err := storage.SaveNode(node); err != nil {
+					fmt.Printf("Failed to add server %s: %v\n", hostname, err)
+					continue
+				}
+
+				fmt.Printf("✓ Server %s added to cluster\n", hostname)
+				fmt.Printf("  ID: %s\n", node.ID)
+				fmt.Printf("  Role: %s\n", node.Role)
+				fmt.Printf("  Port: %d\n", node.Port)
+
+				// TODO: Connect to server and install DockDockGo agent
+				fmt.Printf("  Status: %s (pending agent installation)\n", node.Status)
 			}
-
-			fmt.Printf("✓ Server %s added to cluster\n", hostname)
-			fmt.Printf("  ID: %s\n", node.ID)
-			fmt.Printf("  Role: %s\n", node.Role)
-			fmt.Printf("  Port: %d\n", node.Port)
-
-			// TODO: Connect to server and install DockDockGo agent
-			fmt.Printf("  Status: %s (pending agent installation)\n", node.Status)
 		}
 	},
 }
@@ -275,6 +315,179 @@ var serverStatusCmd = &cobra.Command{
 	},
 }
 
+// Cluster commands
+var clusterCmd = &cobra.Command{
+	Use:   "cluster",
+	Short: "Manage cluster lifecycle",
+	Long:  `Initialize, join, and manage DockDockGo cluster operations.`,
+}
+
+var clusterInitCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Initialize a new cluster",
+	Long:  `Initialize a new DockDockGo cluster on this node. This node will become the cluster master.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		advertiseAddr, _ := cmd.Flags().GetString("advertise-addr")
+		
+		storage, err := storage.NewDefaultStorage()
+		if err != nil {
+			fmt.Printf("Failed to initialize storage: %v\n", err)
+			return
+		}
+		defer storage.Close()
+
+		// Get hostname and IP
+		hostname, err := os.Hostname()
+		if err != nil {
+			fmt.Printf("Failed to get hostname: %v\n", err)
+			return
+		}
+
+		// Use advertise-addr or hostname as IP
+		ipAddress := advertiseAddr
+		if ipAddress == "" {
+			ipAddress = hostname
+		}
+
+		// Create master node
+		masterNode := &types.Node{
+			ID:            uuid.New().String(),
+			Hostname:      hostname,
+			IPAddress:     ipAddress,
+			Port:          8443,
+			Status:        types.NodeOnline,
+			Role:          "master",
+			Version:       "1.0.0", // TODO: Get actual version
+			Labels:        map[string]string{"cluster.role": "master"},
+			LastHeartbeat: time.Now(),
+			JoinedAt:      time.Now(),
+		}
+
+		// Check if cluster already exists
+		nodes, err := storage.ListNodes()
+		if err != nil {
+			fmt.Printf("Failed to check existing cluster: %v\n", err)
+			return
+		}
+
+		if len(nodes) > 0 {
+			fmt.Printf("Cluster already initialized. Found %d existing nodes.\n", len(nodes))
+			fmt.Printf("Use 'dockdockgo server list' to see cluster status.\n")
+			return
+		}
+
+		// Save master node
+		if err := storage.SaveNode(masterNode); err != nil {
+			fmt.Printf("Failed to initialize cluster: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✓ Cluster initialized successfully\n")
+		fmt.Printf("  Master Node ID: %s\n", masterNode.ID)
+		fmt.Printf("  Hostname: %s\n", masterNode.Hostname)
+		fmt.Printf("  IP Address: %s\n", masterNode.IPAddress)
+		fmt.Printf("  Port: %d\n", masterNode.Port)
+		fmt.Printf("\nTo add workers to this cluster, run on other nodes:\n")
+		fmt.Printf("  dockdockgo cluster join %s\n", ipAddress)
+	},
+}
+
+var clusterJoinCmd = &cobra.Command{
+	Use:   "join [MASTER_ADDRESS]",
+	Short: "Join an existing cluster",
+	Long:  `Join this node to an existing DockDockGo cluster by connecting to the master node.`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		masterAddr := args[0]
+		role, _ := cmd.Flags().GetString("role")
+
+		storage, err := storage.NewDefaultStorage()
+		if err != nil {
+			fmt.Printf("Failed to initialize storage: %v\n", err)
+			return
+		}
+		defer storage.Close()
+
+		// Get hostname
+		hostname, err := os.Hostname()
+		if err != nil {
+			fmt.Printf("Failed to get hostname: %v\n", err)
+			return
+		}
+
+		fmt.Printf("Attempting to join cluster at %s...\n", masterAddr)
+
+		// Try to fetch cluster state from master
+		clusterState, err := fetchClusterState(masterAddr)
+		if err != nil {
+			fmt.Printf("Failed to connect to master node: %v\n", err)
+			fmt.Printf("Make sure the master node is running and accessible at %s:8080\n", masterAddr)
+			return
+		}
+
+		// Save all nodes from cluster state
+		for _, node := range clusterState {
+			if err := storage.SaveNode(node); err != nil {
+				fmt.Printf("Warning: Failed to save node %s: %v\n", node.Hostname, err)
+			}
+		}
+
+		// Create this node and add it to the cluster
+		thisNode := &types.Node{
+			ID:            uuid.New().String(),
+			Hostname:      hostname,
+			IPAddress:     hostname, // TODO: Get actual IP
+			Port:          8443,
+			Status:        types.NodeOnline,
+			Role:          role,
+			Version:       "1.0.0", // TODO: Get actual version
+			Labels:        map[string]string{"cluster.role": role},
+			LastHeartbeat: time.Now(),
+			JoinedAt:      time.Now(),
+		}
+
+		if err := storage.SaveNode(thisNode); err != nil {
+			fmt.Printf("Failed to save this node: %v\n", err)
+			return
+		}
+
+		// TODO: Register this node with the master
+		fmt.Printf("✓ Successfully joined cluster\n")
+		fmt.Printf("  This Node ID: %s\n", thisNode.ID)
+		fmt.Printf("  Role: %s\n", thisNode.Role)
+		fmt.Printf("  Master: %s\n", masterAddr)
+		fmt.Printf("  Cluster Nodes: %d\n", len(clusterState)+1)
+		fmt.Printf("\nRun 'dockdockgo server list' to see all cluster nodes.\n")
+	},
+}
+
+func fetchClusterState(masterAddr string) ([]*types.Node, error) {
+	// Try to fetch cluster state from master node's API
+	url := fmt.Sprintf("http://%s:8080/api/v1/nodes", masterAddr)
+	
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to master API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("master API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var nodes []*types.Node
+	if err := json.Unmarshal(body, &nodes); err != nil {
+		return nil, fmt.Errorf("failed to parse cluster state: %w", err)
+	}
+
+	return nodes, nil
+}
+
 func parseLabels(labels []string) map[string]string {
 	labelMap := make(map[string]string)
 
@@ -311,6 +524,11 @@ func init() {
 	serverCmd.AddCommand(serverRemoveCmd)
 	serverCmd.AddCommand(serverStatusCmd)
 
+	// Add cluster commands
+	rootCmd.AddCommand(clusterCmd)
+	clusterCmd.AddCommand(clusterInitCmd)
+	clusterCmd.AddCommand(clusterJoinCmd)
+
 	// Server add flags
 	serverAddCmd.Flags().IntP("port", "p", 8443, "gRPC port for cluster communication")
 	serverAddCmd.Flags().StringP("role", "r", "worker", "Server role (master, worker)")
@@ -318,4 +536,10 @@ func init() {
 
 	// Server remove flags
 	serverRemoveCmd.Flags().BoolP("force", "f", false, "Force removal even with running containers")
+
+	// Cluster init flags
+	clusterInitCmd.Flags().StringP("advertise-addr", "a", "", "IP address to advertise to other nodes (defaults to hostname)")
+
+	// Cluster join flags
+	clusterJoinCmd.Flags().StringP("role", "r", "worker", "Role for this node in the cluster (worker, master)")
 }

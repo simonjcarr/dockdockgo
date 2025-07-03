@@ -130,6 +130,21 @@ install_binary() {
     log_success "Binary installed to $INSTALL_DIR/$BINARY_NAME"
 }
 
+install_uninstall_script() {
+    local temp_dir="$1"
+    local uninstall_script="$temp_dir/uninstall.sh"
+    local target_path="/usr/local/bin/dockdockgo-uninstall.sh"
+    
+    if [[ -f "$uninstall_script" ]]; then
+        log_info "Installing uninstall script to $target_path..."
+        cp "$uninstall_script" "$target_path"
+        chmod +x "$target_path"
+        log_success "Uninstall script installed to $target_path"
+    else
+        log_warning "Uninstall script not found in release archive"
+    fi
+}
+
 create_user() {
     if ! id "$BINARY_NAME" &>/dev/null; then
         log_info "Creating dockdockgo user..."
@@ -163,7 +178,7 @@ Requires=docker.service
 Type=simple
 User=$BINARY_NAME
 Group=$BINARY_NAME
-ExecStart=$INSTALL_DIR/$BINARY_NAME daemon
+ExecStart=$INSTALL_DIR/$BINARY_NAME api start
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
@@ -209,7 +224,9 @@ main() {
     
     # Download and install
     local binary_path=$(download_binary "$version" "$arch")
+    local temp_dir=$(dirname "$binary_path")
     install_binary "$binary_path"
+    install_uninstall_script "$temp_dir"
     
     # Setup system
     create_user
@@ -235,6 +252,7 @@ main() {
         log_info "  sudo systemctl status dockdockgo    # Check service status"
         log_info "  sudo journalctl -u dockdockgo       # View logs"
         log_info "  dockdockgo --help                   # View CLI help"
+        log_info "  sudo dockdockgo-uninstall.sh        # Uninstall DockDockGo"
         log_info ""
         log_info "Data directory: $DATA_DIR"
         log_info "Config directory: $CONFIG_DIR"
@@ -258,10 +276,11 @@ Options:
 This script will:
   1. Download the latest DockDockGo release
   2. Install the binary to $INSTALL_DIR
-  3. Create a system user for DockDockGo
-  4. Set up directories and permissions
-  5. Create and enable a systemd service
-  6. Configure firewall rules (if ufw is available)
+  3. Install the uninstall script to /usr/local/bin/dockdockgo-uninstall.sh
+  4. Create a system user for DockDockGo
+  5. Set up directories and permissions
+  6. Create and enable a systemd service
+  7. Configure firewall rules (if ufw is available)
 
 Requirements:
   - Linux AMD64 system

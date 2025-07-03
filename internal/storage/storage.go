@@ -22,9 +22,25 @@ type Storage struct {
 }
 
 func NewStorage(dbPath string) (*Storage, error) {
-	db, err := bbolt.Open(dbPath, 0600, &bbolt.Options{Timeout: 1 * time.Second})
+	const maxRetries = 3
+	const retryDelay = 2 * time.Second
+
+	var db *bbolt.DB
+	var err error
+
+	for i := 0; i < maxRetries; i++ {
+		db, err = bbolt.Open(dbPath, 0600, &bbolt.Options{Timeout: 10 * time.Second})
+		if err == nil {
+			break
+		}
+
+		if i < maxRetries-1 {
+			time.Sleep(retryDelay)
+		}
+	}
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return nil, fmt.Errorf("failed to open database after %d retries: %w", maxRetries, err)
 	}
 
 	storage := &Storage{db: db}

@@ -31,10 +31,111 @@ The API will set it appart from docker and docker swarm in order to allow easy r
 - The each instance of the app on each server, will act as a tcp and http router supporting both http and https and will route traffic based on different policies (configurable) in order to share the traffic load between container instances. It should run an instance of redis in docker on each server in order to take care of managing instance availability, port mappings, and routing settings etc.
 - The app should support using lets encrypt and self signed certificates for https
 
-## progress tracking
-This is your todo list of tasks to complete.
-- if you find you new features you need to add, record them in PLAN.md. Ensure they go in the correct place in the file, so they implimented in the correct order.
-- When you complete a feature ensure you check the item as complete in the PLAN.md file
+## Development Workflow & Automation
+
+This project uses **fully automated semantic versioning** and **professional CI/CD workflows**. Always follow these guidelines:
+
+### Branch Strategy
+- **main branch**: Production releases (`1.0.0`, `1.2.0`, `2.0.0`)
+- **develop branch**: Development releases (`1.0.0-beta.1`, `1.1.0-beta.2`)
+- **feature branches**: Individual features/fixes (`feat/new-feature`, `fix/bug-name`)
+
+### Feature Branch Workflow
+**ALWAYS create feature branches for ANY changes - never commit directly to develop or main:**
+
+1. **Create focused feature branches** for small, related chunks of work:
+   ```bash
+   git checkout -b feat/descriptive-feature-name  # for new features
+   git checkout -b fix/descriptive-fix-name       # for bug fixes
+   git checkout -b docs/descriptive-doc-name      # for documentation
+   ```
+
+2. **Keep feature branches small and focused** - one logical change per branch:
+   - ✅ `feat/add-gRPC-server` - implements gRPC communication
+   - ✅ `fix/container-hanging-issue` - fixes specific container bug
+   - ✅ `docs/update-api-documentation` - updates API docs
+   - ❌ `feat/massive-refactor-everything` - too broad
+
+3. **Use conventional commit messages** (this drives automatic versioning):
+   ```
+   feat: add new feature that enables X
+   fix: resolve issue with Y component  
+   docs: update API documentation
+   style: format code with gofmt
+   refactor: restructure database layer
+   test: add integration tests for auth
+   build: update CI/CD pipeline
+   chore: update dependencies
+   ```
+
+### Pull Request Process
+**ALWAYS merge feature branches via pull requests:**
+
+1. **Create pull request** with descriptive title using conventional format:
+   ```
+   feat: implement gRPC cluster communication
+   fix: resolve container hanging on remote servers
+   docs: add API authentication examples
+   ```
+
+2. **Pull requests are automatically merged** - no manual intervention needed
+3. **CI/CD runs automatically** on every pull request:
+   - Code formatting checks (`gofmt`)
+   - Tests execution (`go test ./...`)
+   - Build verification
+   - Semantic versioning
+
+### Automated Versioning System
+**Semantic versioning is fully automated** based on conventional commits:
+
+- **feat:** commits → Minor version bump (`1.0.0` → `1.1.0`)
+- **fix:** commits → Patch version bump (`1.0.0` → `1.0.1`)
+- **BREAKING CHANGE:** → Major version bump (`1.0.0` → `2.0.0`)
+
+**Release Examples:**
+- **Develop branch**: `v1.0.0-beta.1`, `v1.1.0-beta.2` (pre-releases)
+- **Main branch**: `v1.0.0`, `v1.1.0`, `v2.0.0` (production releases)
+
+### Work Chunking Guidelines
+**Break work into small, logical feature branches:**
+
+✅ **Good Examples:**
+- `feat/add-health-check-endpoint` - Single API endpoint
+- `fix/port-conflict-resolution` - Specific bug fix
+- `feat/implement-container-scheduling` - One component
+- `docs/deployment-guide` - Focused documentation
+
+❌ **Avoid These:**
+- `feat/complete-distributed-system` - Too broad
+- `fix/various-bugs` - Multiple unrelated fixes
+- `refactor/everything` - Too sweeping
+
+### Progress Tracking
+- **Use TodoWrite tool** extensively to track progress and plan work
+- **Update PLAN.md** when discovering new features to implement
+- **Mark completed items** in PLAN.md as work is finished
+- **Always complete merges** of feature branches into develop
+
+### Version Consistency
+- **Local builds** use same versioning as GitHub releases
+- **Build artifacts** include proper semantic versions
+- **Git tags** drive version detection automatically
+
+### Key Commands
+```bash
+# Create and work on feature branch
+git checkout -b feat/your-feature
+# ... make changes ...
+git add .
+git commit -m "feat: add your feature description"
+git push --set-upstream origin feat/your-feature
+
+# Create and auto-merge pull request  
+gh pr create --title "feat: add your feature" --body "Description" --base develop
+gh pr merge --squash --delete-branch
+```
+
+**Remember: Every change goes through feature branch → PR → automated merge → automated release**
 
 ## Documentation
 You create a README.md file that contains instructions on how to use dockdockgo

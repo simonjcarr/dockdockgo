@@ -52,9 +52,11 @@ jobs:
             echo "branch=main" >> $GITHUB_OUTPUT
             echo "prerelease=false" >> $GITHUB_OUTPUT
           else
-            # Development release - use pre-release versioning
+            # Development release - use semantic pre-release versioning  
             COMMIT_COUNT=$(git rev-list --count HEAD)
-            VERSION="0.$(date +%Y%m%d).${COMMIT_COUNT}-beta"
+            MINOR=$((COMMIT_COUNT / 10))
+            PATCH=$((COMMIT_COUNT % 10))
+            VERSION="0.${MINOR}.${PATCH}-beta"
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "branch=develop" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT

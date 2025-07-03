@@ -1,0 +1,24 @@
+# Build artifacts
+/bin/*
+*.tar.gz
+
+# Database files
+dockdockgo.db
+*.db
+
+# Logs
+*.log
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp

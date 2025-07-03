@@ -220,13 +220,19 @@ func (o *Orchestrator) deployToServer(server *ssh.Server, config *DeploymentConf
 	cmd := o.buildDockerRunCommand(config, containerName, replicaIndex)
 	
 	fmt.Printf("Starting container %s on %s...\n", containerName, host)
+	fmt.Printf("Command: %s\n", cmd)
+	
 	output, err := server.Execute(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to run container: %w\nOutput: %s", err, output)
 	}
 
 	containerID := strings.TrimSpace(output)
-	fmt.Printf("✓ Container %s started on %s (ID: %s)\n", containerName, host, containerID[:12])
+	if len(containerID) < 12 {
+		fmt.Printf("✓ Container %s started on %s (ID: %s)\n", containerName, host, containerID)
+	} else {
+		fmt.Printf("✓ Container %s started on %s (ID: %s)\n", containerName, host, containerID[:12])
+	}
 
 	return nil
 }
@@ -234,10 +240,8 @@ func (o *Orchestrator) deployToServer(server *ssh.Server, config *DeploymentConf
 func (o *Orchestrator) buildDockerRunCommand(config *DeploymentConfig, containerName string, replicaIndex int) string {
 	cmd := []string{"docker", "run"}
 
-	// Add detach flag
-	if config.Detach {
-		cmd = append(cmd, "-d")
-	}
+	// Always run in detached mode for remote deployments to prevent SSH hanging
+	cmd = append(cmd, "-d")
 
 	// Add name
 	if containerName != "" {

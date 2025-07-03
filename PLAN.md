@@ -57,15 +57,50 @@ This document outlines all features that need to be implemented for the DockDock
 - [x] Create `ps` command for container status across servers
 - [x] Add `logs` command for distributed log viewing
 
-## Phase 3: Clustering & High Availability (Medium Priority)
+## Phase 3: Distributed Cluster Architecture (High Priority)
 
-### Cluster Management
-- [ ] Integrate ZooKeeper for cluster coordination
-- [ ] Implement master/follower election algorithm
-- [ ] Create remote agent installation system
-- [ ] Add agent auto-deployment to remote servers
-- [ ] Implement cluster state synchronization
-- [ ] Add node failure detection and recovery
+### Core Infrastructure & Data Models
+- [x] Design deployment, container, and server data models
+- [x] Implement embedded database (BoltDB) for cluster state
+- [x] Create state management and persistence layer
+- [x] Add deployment CRUD operations
+- [x] Implement deployment lifecycle tracking
+
+### Inter-Node Communication (gRPC)
+- [ ] Create gRPC service definitions for cluster communication
+- [ ] Implement node registration and discovery mechanism
+- [ ] Add basic node-to-node communication
+- [ ] Implement cluster join/leave operations
+- [ ] Create secure mTLS communication
+
+### Master Election & Consensus (Raft)
+- [ ] Integrate Raft consensus algorithm for master election
+- [ ] Implement leader election and log replication
+- [ ] Add cluster state synchronization
+- [ ] Create failover and recovery mechanisms
+- [ ] Handle network partitions and split-brain scenarios
+
+### Container State Monitoring
+- [ ] Implement Docker Events API monitoring on worker nodes
+- [ ] Create periodic container health checks
+- [ ] Add application-level health probes
+- [ ] Implement real-time state streaming to master
+- [ ] Create state reconciliation logic
+- [ ] Add automatic failure detection and recovery
+
+### New CLI Interface
+- [x] Replace `run` command with `deploy create` 
+- [x] Implement `deploy scale`, `deploy destroy`, `deploy list`
+- [x] Create `server add/remove/list` commands
+- [x] Add deployment status and monitoring commands
+- [ ] Implement cluster status commands
+
+### Agent Installation & Management
+- [ ] Create DockDockGo agent installer
+- [ ] Implement automatic agent deployment to new servers
+- [ ] Add agent version management and updates
+- [ ] Create server onboarding workflow
+- [ ] Implement server capacity and resource tracking
 
 ### Load Balancing & Routing
 - [ ] Create HTTP/HTTPS traffic routing system
@@ -182,10 +217,10 @@ This document outlines all features that need to be implemented for the DockDock
 
 - **Phase 1**: 18/20 features complete (90%)
 - **Phase 2**: 14/15 features complete (93%)
-- **Phase 3**: 0/12 features complete (0%)
+- **Phase 3**: 9/36 features complete (25%)
 - **Phase 4**: 0/8 features complete (0%)
 - **Phase 5**: 0/8 features complete (0%)
 - **Phase 6**: 0/12 features complete (0%)
 - **API Endpoints**: 0/18 endpoints complete (0%)
 
-**Total Progress**: 32/93 features complete (34%)
+**Total Progress**: 41/117 features complete (35%)

@@ -100,12 +100,25 @@ func (c *Client) Execute(command string) (string, error) {
 	}
 	defer session.Close()
 
-	output, err := session.CombinedOutput(command)
-	if err != nil {
-		return string(output), fmt.Errorf("command failed: %w", err)
-	}
+	// Set a timeout for long-running commands
+	done := make(chan error, 1)
+	var output []byte
+	
+	go func() {
+		output, err = session.CombinedOutput(command)
+		done <- err
+	}()
 
-	return string(output), nil
+	select {
+	case err := <-done:
+		if err != nil {
+			return string(output), fmt.Errorf("command failed: %w", err)
+		}
+		return string(output), nil
+	case <-time.After(60 * time.Second): // 60 second timeout
+		session.Close() // Close the session instead of trying to signal
+		return "", fmt.Errorf("command timed out after 60 seconds")
+	}
 }
 
 func (c *Client) ExecuteWithStdin(command, stdin string) (string, error) {

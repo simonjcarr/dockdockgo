@@ -34,10 +34,11 @@ fi
 mkdir -p "$BUILD_DIR"
 
 # Get version info
-# Try to get semantic version from git tags first
-VERSION=$(git describe --tags --exact-match 2>/dev/null || echo "")
+# Try to get semantic version from git tags first (including annotated tags)
+VERSION=$(git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo "")
+
 if [ -z "$VERSION" ]; then
-    # If no exact tag, check if we're on a known branch
+    # If no tags, check if we're on a known branch
     BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
     if [ "$BRANCH" = "main" ]; then
         VERSION="1.0.0-dev"
@@ -47,6 +48,9 @@ if [ -z "$VERSION" ]; then
     else
         VERSION="dev-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
     fi
+else
+    # Clean up git describe output (remove 'v' prefix if present)
+    VERSION=$(echo "$VERSION" | sed 's/^v//')
 fi
 
 COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")

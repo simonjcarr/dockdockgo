@@ -37,11 +37,11 @@ type ClusterJoinRequest struct {
 }
 
 type ClusterInitResponse struct {
-	NodeID        string `json:"node_id"`
-	Hostname      string `json:"hostname"`
-	IPAddress     string `json:"ip_address"`
-	Port          int    `json:"port"`
-	JoinCommand   string `json:"join_command"`
+	NodeID      string `json:"node_id"`
+	Hostname    string `json:"hostname"`
+	IPAddress   string `json:"ip_address"`
+	Port        int    `json:"port"`
+	JoinCommand string `json:"join_command"`
 }
 
 type ClusterJoinResponse struct {
@@ -267,7 +267,7 @@ func (s *Server) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) fetchClusterStateFromMaster(masterAddr string) ([]*types.Node, error) {
 	// Try to fetch cluster state from master node's API
 	url := fmt.Sprintf("http://%s:8080/api/v1/nodes", masterAddr)
-	
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to master API: %w", err)

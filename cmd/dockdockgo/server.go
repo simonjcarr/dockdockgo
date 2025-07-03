@@ -322,12 +322,12 @@ var clusterInitCmd = &cobra.Command{
 	Long:  `Initialize a new DockDockGo cluster on this node. This node will become the cluster master.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		advertiseAddr, _ := cmd.Flags().GetString("advertise-addr")
-		
+
 		// Try API-first approach
 		client := api.NewClient("localhost", "8080")
 		if client.IsServiceRunning() {
 			fmt.Printf("Using DockDockGo API service...\n")
-			
+
 			response, err := client.ClusterInit(advertiseAddr)
 			if err != nil {
 				fmt.Printf("Failed to initialize cluster via API: %v\n", err)
@@ -428,7 +428,7 @@ var clusterJoinCmd = &cobra.Command{
 		client := api.NewClient("localhost", "8080")
 		if client.IsServiceRunning() {
 			fmt.Printf("Using DockDockGo API service...\n")
-			
+
 			response, err := client.ClusterJoin(masterAddr, role)
 			if err != nil {
 				fmt.Printf("Failed to join cluster via API: %v\n", err)
@@ -538,7 +538,7 @@ func getNodesList() ([]*types.Node, error) {
 func fetchClusterState(masterAddr string) ([]*types.Node, error) {
 	// Try to fetch cluster state from master node's API
 	url := fmt.Sprintf("http://%s:8080/api/v1/nodes", masterAddr)
-	
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to master API: %w", err)

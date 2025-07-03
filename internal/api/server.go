@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"dockdockgo/internal/storage"
 	"dockdockgo/pkg/types"
 	"encoding/json"
@@ -75,6 +76,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/images/search", s.handleImageSearch).Methods("GET")
 	api.HandleFunc("/compose", s.handleCompose).Methods("POST")
 	api.HandleFunc("/nodes", s.handleNodes).Methods("GET")
+	api.HandleFunc("/nodes/register", s.handleNodeRegister).Methods("POST")
 	api.HandleFunc("/cluster/init", s.handleClusterInit).Methods("POST")
 	api.HandleFunc("/cluster/join", s.handleClusterJoin).Methods("POST")
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
@@ -221,44 +223,82 @@ func (s *Server) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Try to fetch cluster state from master
-	clusterState, err := s.fetchClusterStateFromMaster(req.MasterAddr)
+	// Check if this node already exists in the cluster
+	existingNodes, err := s.storage.ListNodes()
 	if err != nil {
-		s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to connect to master node: %v", err)})
+		s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to check existing nodes: %v", err)})
 		return
 	}
 
-	// Save all nodes from cluster state
-	for _, node := range clusterState {
-		if err := s.storage.SaveNode(node); err != nil {
-			log.Printf("Warning: Failed to save node %s: %v", node.Hostname, err)
+	// Check for duplicate by hostname
+	var existingNode *types.Node
+	for _, node := range existingNodes {
+		if node.Hostname == hostname {
+			existingNode = node
+			break
 		}
 	}
 
-	// Create this node and add it to the cluster
-	thisNode := &types.Node{
-		ID:            uuid.New().String(),
-		Hostname:      hostname,
-		IPAddress:     hostname, // TODO: Get actual IP
-		Port:          8443,
-		Status:        types.NodeOnline,
-		Role:          req.Role,
-		Version:       "1.0.0", // TODO: Get actual version
-		Labels:        map[string]string{"cluster.role": req.Role},
-		LastHeartbeat: time.Now(),
-		JoinedAt:      time.Now(),
+	var thisNode *types.Node
+	if existingNode != nil {
+		// Update existing node
+		existingNode.Role = req.Role
+		existingNode.Status = types.NodeOnline
+		existingNode.LastHeartbeat = time.Now()
+		if err := s.storage.SaveNode(existingNode); err != nil {
+			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to update this node: %v", err)})
+			return
+		}
+		thisNode = existingNode
+	} else {
+		// Try to fetch cluster state from master
+		clusterState, err := s.fetchClusterStateFromMaster(req.MasterAddr)
+		if err != nil {
+			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to connect to master node: %v", err)})
+			return
+		}
+
+		// Save all nodes from cluster state
+		for _, node := range clusterState {
+			if err := s.storage.SaveNode(node); err != nil {
+				log.Printf("Warning: Failed to save node %s: %v", node.Hostname, err)
+			}
+		}
+
+		// Create this node and add it to the cluster
+		thisNode = &types.Node{
+			ID:            uuid.New().String(),
+			Hostname:      hostname,
+			IPAddress:     hostname, // TODO: Get actual IP
+			Port:          8443,
+			Status:        types.NodeOnline,
+			Role:          req.Role,
+			Version:       "1.0.0", // TODO: Get actual version
+			Labels:        map[string]string{"cluster.role": req.Role},
+			LastHeartbeat: time.Now(),
+			JoinedAt:      time.Now(),
+		}
+
+		if err := s.storage.SaveNode(thisNode); err != nil {
+			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to save this node: %v", err)})
+			return
+		}
+
+		// Register this node with the master
+		if err := s.registerWithMaster(req.MasterAddr, thisNode); err != nil {
+			log.Printf("Warning: Failed to register with master: %v", err)
+			// Don't fail the join operation, just log the warning
+		}
 	}
 
-	if err := s.storage.SaveNode(thisNode); err != nil {
-		s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to save this node: %v", err)})
-		return
-	}
+	// Get final cluster count
+	finalNodes, _ := s.storage.ListNodes()
 
 	response := ClusterJoinResponse{
 		NodeID:       thisNode.ID,
 		Role:         thisNode.Role,
 		Master:       req.MasterAddr,
-		ClusterNodes: len(clusterState) + 1,
+		ClusterNodes: len(finalNodes),
 	}
 
 	s.sendJSON(w, Response{Success: true, Data: response})
@@ -284,6 +324,73 @@ func (s *Server) fetchClusterStateFromMaster(masterAddr string) ([]*types.Node, 
 	}
 
 	return nodes, nil
+}
+
+func (s *Server) handleNodeRegister(w http.ResponseWriter, r *http.Request) {
+	var node types.Node
+	if err := json.NewDecoder(r.Body).Decode(&node); err != nil {
+		s.sendJSON(w, Response{Success: false, Error: "Invalid node data"})
+		return
+	}
+
+	// Check if node already exists
+	existingNodes, err := s.storage.ListNodes()
+	if err != nil {
+		s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to check existing nodes: %v", err)})
+		return
+	}
+
+	var existingNode *types.Node
+	for _, existing := range existingNodes {
+		if existing.Hostname == node.Hostname {
+			existingNode = existing
+			break
+		}
+	}
+
+	if existingNode != nil {
+		// Update existing node
+		existingNode.Role = node.Role
+		existingNode.Status = node.Status
+		existingNode.IPAddress = node.IPAddress
+		existingNode.Port = node.Port
+		existingNode.LastHeartbeat = time.Now()
+		
+		if err := s.storage.SaveNode(existingNode); err != nil {
+			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to update node: %v", err)})
+			return
+		}
+		s.sendJSON(w, Response{Success: true, Data: "Node updated successfully"})
+	} else {
+		// Register new node
+		node.LastHeartbeat = time.Now()
+		if err := s.storage.SaveNode(&node); err != nil {
+			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to register node: %v", err)})
+			return
+		}
+		s.sendJSON(w, Response{Success: true, Data: "Node registered successfully"})
+	}
+}
+
+func (s *Server) registerWithMaster(masterAddr string, node *types.Node) error {
+	url := fmt.Sprintf("http://%s:8080/api/v1/nodes/register", masterAddr)
+	
+	nodeData, err := json.Marshal(node)
+	if err != nil {
+		return fmt.Errorf("failed to marshal node data: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(nodeData))
+	if err != nil {
+		return fmt.Errorf("failed to connect to master: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("master returned status %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

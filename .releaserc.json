@@ -12,7 +12,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "VERSION=${nextRelease.version} COMMIT=$(git rev-parse --short HEAD) BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S') LDFLAGS=\"-X main.Version=${nextRelease.version} -X main.Commit=$(git rev-parse --short HEAD) -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')\" && mkdir -p bin && go build -ldflags \"$LDFLAGS\" -o bin/dockdockgo main.go && tar -czf dockdockgo-linux-amd64.tar.gz -C bin dockdockgo -C .. install.sh INSTALL.md USAGE.md"
+        "prepareCmd": "VERSION=${nextRelease.version} COMMIT=$(git rev-parse --short HEAD) BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S') LDFLAGS=\"-X main.Version=${nextRelease.version} -X main.Commit=$(git rev-parse --short HEAD) -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')\" && mkdir -p bin && go build -ldflags \"$LDFLAGS\" -o bin/dockdockgo main.go && tar -czf dockdockgo-linux-amd64.tar.gz -C bin dockdockgo -C .. install.sh uninstall.sh INSTALL.md USAGE.md"
       }
     ],
     [

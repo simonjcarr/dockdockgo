@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"dockdockgo/pkg/types"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -108,4 +109,23 @@ func (c *Client) ClusterJoin(masterAddr, role string) (*ClusterJoinResponse, err
 	}
 
 	return &joinResponse, nil
+}
+
+func (c *Client) ListNodes() ([]*types.Node, error) {
+	resp, err := c.httpClient.Get(c.baseURL + "/nodes")
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	var nodes []*types.Node
+	if err := json.NewDecoder(resp.Body).Decode(&nodes); err != nil {
+		return nil, fmt.Errorf("failed to decode nodes: %w", err)
+	}
+
+	return nodes, nil
 }

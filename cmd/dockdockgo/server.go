@@ -113,16 +113,9 @@ var serverListCmd = &cobra.Command{
 	Short: "List cluster servers",
 	Long:  `List all servers in the DockDockGo cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		storage, err := storage.NewDefaultStorage()
+		nodes, err := getNodesList()
 		if err != nil {
-			fmt.Printf("Failed to initialize storage: %v\n", err)
-			return
-		}
-		defer storage.Close()
-
-		nodes, err := storage.ListNodes()
-		if err != nil {
-			fmt.Printf("Failed to list servers: %v\n", err)
+			fmt.Printf("Error: %v\n", err)
 			return
 		}
 
@@ -513,6 +506,33 @@ var clusterJoinCmd = &cobra.Command{
 		fmt.Printf("  Cluster Nodes: %d\n", len(clusterState)+1)
 		fmt.Printf("\nRun 'dockdockgo server list' to see all cluster nodes.\n")
 	},
+}
+
+func getNodesList() ([]*types.Node, error) {
+	// Try API-first approach
+	client := api.NewClient("localhost", "8080")
+	if client.IsServiceRunning() {
+		nodes, err := client.ListNodes()
+		if err == nil {
+			return nodes, nil
+		}
+		fmt.Printf("Failed to list servers via API: %v\n", err)
+		fmt.Printf("Falling back to direct database access...\n")
+	}
+
+	// Fallback to direct database access
+	storage, err := storage.NewDefaultStorage()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize storage: %v\n\nTroubleshooting:\n- Ensure no other DockDockGo processes are running\n- Check database permissions in /var/lib/dockdockgo/\n- Try stopping the DockDockGo service: sudo systemctl stop dockdockgo", err)
+	}
+	defer storage.Close()
+
+	nodes, err := storage.ListNodes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list servers: %v", err)
+	}
+
+	return nodes, nil
 }
 
 func fetchClusterState(masterAddr string) ([]*types.Node, error) {

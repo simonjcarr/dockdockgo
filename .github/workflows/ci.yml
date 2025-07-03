@@ -119,7 +119,7 @@ jobs:
           ./bin/dockdockgo --help
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dockdockgo-linux-amd64
           path: bin/dockdockgo

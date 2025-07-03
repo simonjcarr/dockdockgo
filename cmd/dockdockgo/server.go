@@ -464,46 +464,76 @@ var clusterJoinCmd = &cobra.Command{
 			return
 		}
 
-		// Try to fetch cluster state from master
-		clusterState, err := fetchClusterState(masterAddr)
+		// Check if this node already exists
+		existingNodes, err := storage.ListNodes()
 		if err != nil {
-			fmt.Printf("Failed to connect to master node: %v\n", err)
-			fmt.Printf("Make sure the master node is running and accessible at %s:8080\n", masterAddr)
+			fmt.Printf("Failed to check existing nodes: %v\n", err)
 			return
 		}
 
-		// Save all nodes from cluster state
-		for _, node := range clusterState {
-			if err := storage.SaveNode(node); err != nil {
-				fmt.Printf("Warning: Failed to save node %s: %v\n", node.Hostname, err)
+		var existingNode *types.Node
+		for _, node := range existingNodes {
+			if node.Hostname == hostname {
+				existingNode = node
+				break
 			}
 		}
 
-		// Create this node and add it to the cluster
-		thisNode := &types.Node{
-			ID:            uuid.New().String(),
-			Hostname:      hostname,
-			IPAddress:     hostname, // TODO: Get actual IP
-			Port:          8443,
-			Status:        types.NodeOnline,
-			Role:          role,
-			Version:       "1.0.0", // TODO: Get actual version
-			Labels:        map[string]string{"cluster.role": role},
-			LastHeartbeat: time.Now(),
-			JoinedAt:      time.Now(),
+		var thisNode *types.Node
+		if existingNode != nil {
+			// Update existing node
+			existingNode.Role = role
+			existingNode.Status = types.NodeOnline
+			existingNode.LastHeartbeat = time.Now()
+			if err := storage.SaveNode(existingNode); err != nil {
+				fmt.Printf("Failed to update this node: %v\n", err)
+				return
+			}
+			thisNode = existingNode
+		} else {
+			// Try to fetch cluster state from master
+			clusterState, err := fetchClusterState(masterAddr)
+			if err != nil {
+				fmt.Printf("Failed to connect to master node: %v\n", err)
+				fmt.Printf("Make sure the master node is running and accessible at %s:8080\n", masterAddr)
+				return
+			}
+
+			// Save all nodes from cluster state
+			for _, node := range clusterState {
+				if err := storage.SaveNode(node); err != nil {
+					fmt.Printf("Warning: Failed to save node %s: %v\n", node.Hostname, err)
+				}
+			}
+
+			// Create this node and add it to the cluster
+			thisNode = &types.Node{
+				ID:            uuid.New().String(),
+				Hostname:      hostname,
+				IPAddress:     hostname, // TODO: Get actual IP
+				Port:          8443,
+				Status:        types.NodeOnline,
+				Role:          role,
+				Version:       "1.0.0", // TODO: Get actual version
+				Labels:        map[string]string{"cluster.role": role},
+				LastHeartbeat: time.Now(),
+				JoinedAt:      time.Now(),
+			}
+
+			if err := storage.SaveNode(thisNode); err != nil {
+				fmt.Printf("Failed to save this node: %v\n", err)
+				return
+			}
 		}
 
-		if err := storage.SaveNode(thisNode); err != nil {
-			fmt.Printf("Failed to save this node: %v\n", err)
-			return
-		}
+		// Get final cluster count
+		finalNodes, _ := storage.ListNodes()
 
-		// TODO: Register this node with the master
 		fmt.Printf("✓ Successfully joined cluster\n")
 		fmt.Printf("  This Node ID: %s\n", thisNode.ID)
 		fmt.Printf("  Role: %s\n", thisNode.Role)
 		fmt.Printf("  Master: %s\n", masterAddr)
-		fmt.Printf("  Cluster Nodes: %d\n", len(clusterState)+1)
+		fmt.Printf("  Cluster Nodes: %d\n", len(finalNodes))
 		fmt.Printf("\nRun 'dockdockgo server list' to see all cluster nodes.\n")
 	},
 }

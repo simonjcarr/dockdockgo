@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-GITHUB_REPO="simoncarr/dockdockgo"  # Update with your actual GitHub username/repo
+GITHUB_REPO="simonjcarr/dockdockgo"  # Update with your actual GitHub username/repo
 VERSION=""  # Will be automatically updated by CI
 BINARY_NAME="dockdockgo"
 INSTALL_DIR="/usr/local/bin"
@@ -77,7 +77,7 @@ get_latest_version() {
     fi
     
     local latest_version
-    latest_version=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+    latest_version=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases" | grep '"tag_name":' | head -1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
     
     if [[ -z "$latest_version" ]]; then
         log_error "Failed to get latest version from GitHub"

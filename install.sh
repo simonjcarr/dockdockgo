@@ -94,17 +94,17 @@ download_binary() {
     local temp_dir=$(mktemp -d)
     local archive_file="$temp_dir/dockdockgo.tar.gz"
     
-    log_info "Downloading DockDockGo $version for Linux $arch..."
+    log_info "Downloading DockDockGo $version for Linux $arch..." >&2
     
     if ! curl -L -o "$archive_file" "$download_url"; then
-        log_error "Failed to download DockDockGo"
+        log_error "Failed to download DockDockGo" >&2
         rm -rf "$temp_dir"
         exit 1
     fi
     
-    log_info "Extracting binary..."
+    log_info "Extracting binary..." >&2
     if ! tar -xzf "$archive_file" -C "$temp_dir"; then
-        log_error "Failed to extract binary"
+        log_error "Failed to extract binary" >&2
         rm -rf "$temp_dir"
         exit 1
     fi

@@ -51,7 +51,7 @@ func getLocalContainerLogs(containerID string, follow bool) error {
 
 func init() {
 	rootCmd.AddCommand(logsCmd)
-	
+
 	logsCmd.Flags().BoolP("follow", "f", false, "Follow log output")
 	logsCmd.Flags().StringSliceP("servers", "s", []string{}, "Get logs from containers on remote servers")
 }

@@ -11,14 +11,14 @@ type Server struct {
 }
 
 type ServerInfo struct {
-	Host           string
-	Port           string
-	User           string
-	OS             string
-	Architecture   string
+	Host            string
+	Port            string
+	User            string
+	OS              string
+	Architecture    string
 	DockerInstalled bool
-	DockerVersion  string
-	Available      bool
+	DockerVersion   string
+	Available       bool
 }
 
 func NewServer(config *Config) *Server {

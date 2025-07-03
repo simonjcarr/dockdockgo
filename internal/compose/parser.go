@@ -10,38 +10,38 @@ import (
 )
 
 type ComposeFile struct {
-	Version  string                    `yaml:"version"`
-	Services map[string]*Service       `yaml:"services"`
-	Networks map[string]*Network       `yaml:"networks"`
-	Volumes  map[string]*Volume        `yaml:"volumes"`
-	Secrets  map[string]*Secret        `yaml:"secrets"`
-	Configs  map[string]*Config        `yaml:"configs"`
-	
+	Version  string              `yaml:"version"`
+	Services map[string]*Service `yaml:"services"`
+	Networks map[string]*Network `yaml:"networks"`
+	Volumes  map[string]*Volume  `yaml:"volumes"`
+	Secrets  map[string]*Secret  `yaml:"secrets"`
+	Configs  map[string]*Config  `yaml:"configs"`
+
 	// DockDockGo extensions
 	DockDockGo *DockDockGoExtension `yaml:"x-dockdockgo"`
 }
 
 type Service struct {
-	Image         string                 `yaml:"image"`
-	Build         *BuildConfig           `yaml:"build"`
-	Command       interface{}            `yaml:"command"`
-	Entrypoint    interface{}            `yaml:"entrypoint"`
-	Environment   interface{}            `yaml:"environment"`
-	Ports         []string               `yaml:"ports"`
-	Volumes       []string               `yaml:"volumes"`
-	Networks      interface{}            `yaml:"networks"`
-	DependsOn     interface{}            `yaml:"depends_on"`
-	Restart       string                 `yaml:"restart"`
-	ContainerName string                 `yaml:"container_name"`
-	Hostname      string                 `yaml:"hostname"`
-	WorkingDir    string                 `yaml:"working_dir"`
-	User          string                 `yaml:"user"`
-	Labels        map[string]string      `yaml:"labels"`
-	Expose        []string               `yaml:"expose"`
-	Links         []string               `yaml:"links"`
-	ExternalLinks []string               `yaml:"external_links"`
-	Deploy        *DeployConfig          `yaml:"deploy"`
-	
+	Image         string            `yaml:"image"`
+	Build         *BuildConfig      `yaml:"build"`
+	Command       interface{}       `yaml:"command"`
+	Entrypoint    interface{}       `yaml:"entrypoint"`
+	Environment   interface{}       `yaml:"environment"`
+	Ports         []string          `yaml:"ports"`
+	Volumes       []string          `yaml:"volumes"`
+	Networks      interface{}       `yaml:"networks"`
+	DependsOn     interface{}       `yaml:"depends_on"`
+	Restart       string            `yaml:"restart"`
+	ContainerName string            `yaml:"container_name"`
+	Hostname      string            `yaml:"hostname"`
+	WorkingDir    string            `yaml:"working_dir"`
+	User          string            `yaml:"user"`
+	Labels        map[string]string `yaml:"labels"`
+	Expose        []string          `yaml:"expose"`
+	Links         []string          `yaml:"links"`
+	ExternalLinks []string          `yaml:"external_links"`
+	Deploy        *DeployConfig     `yaml:"deploy"`
+
 	// DockDockGo extensions
 	DockDockGo *ServiceDockDockGo `yaml:"x-dockdockgo"`
 }
@@ -54,11 +54,11 @@ type BuildConfig struct {
 }
 
 type DeployConfig struct {
-	Replicas    int                    `yaml:"replicas"`
-	UpdateConfig *UpdateConfig         `yaml:"update_config"`
+	Replicas      int                  `yaml:"replicas"`
+	UpdateConfig  *UpdateConfig        `yaml:"update_config"`
 	RestartPolicy *RestartPolicyConfig `yaml:"restart_policy"`
-	Placement   *PlacementConfig       `yaml:"placement"`
-	Resources   *ResourcesConfig       `yaml:"resources"`
+	Placement     *PlacementConfig     `yaml:"placement"`
+	Resources     *ResourcesConfig     `yaml:"resources"`
 }
 
 type UpdateConfig struct {
@@ -68,10 +68,10 @@ type UpdateConfig struct {
 }
 
 type RestartPolicyConfig struct {
-	Condition string `yaml:"condition"`
-	Delay     string `yaml:"delay"`
-	MaxAttempts int  `yaml:"max_attempts"`
-	Window    string `yaml:"window"`
+	Condition   string `yaml:"condition"`
+	Delay       string `yaml:"delay"`
+	MaxAttempts int    `yaml:"max_attempts"`
+	Window      string `yaml:"window"`
 }
 
 type PlacementConfig struct {
@@ -98,8 +98,8 @@ type Network struct {
 }
 
 type IPAMConfig struct {
-	Driver string       `yaml:"driver"`
-	Config []IPAMEntry  `yaml:"config"`
+	Driver string      `yaml:"driver"`
+	Config []IPAMEntry `yaml:"config"`
 }
 
 type IPAMEntry struct {
@@ -128,9 +128,9 @@ type Config struct {
 
 // DockDockGo specific extensions
 type DockDockGoExtension struct {
-	DefaultServers []string                      `yaml:"default_servers"`
-	ServerGroups   map[string][]string           `yaml:"server_groups"`
-	Placement      *GlobalPlacementConfig        `yaml:"placement"`
+	DefaultServers []string               `yaml:"default_servers"`
+	ServerGroups   map[string][]string    `yaml:"server_groups"`
+	Placement      *GlobalPlacementConfig `yaml:"placement"`
 }
 
 type ServiceDockDockGo struct {
@@ -179,14 +179,14 @@ func ParseComposeData(data []byte) (*ComposeFile, error) {
 		if service.Restart == "" {
 			service.Restart = "no"
 		}
-		
+
 		// Process DockDockGo extensions
 		if service.DockDockGo != nil {
 			// Inherit default servers if not specified
 			if len(service.DockDockGo.Servers) == 0 && compose.DockDockGo != nil {
 				service.DockDockGo.Servers = compose.DockDockGo.DefaultServers
 			}
-			
+
 			// Resolve server groups
 			if service.DockDockGo.ServerGroup != "" && compose.DockDockGo != nil {
 				if servers, exists := compose.DockDockGo.ServerGroups[service.DockDockGo.ServerGroup]; exists {
@@ -201,7 +201,7 @@ func ParseComposeData(data []byte) (*ComposeFile, error) {
 
 func (s *Service) GetEnvironmentMap() map[string]string {
 	env := make(map[string]string)
-	
+
 	switch e := s.Environment.(type) {
 	case []interface{}:
 		for _, item := range e {
@@ -232,7 +232,7 @@ func (s *Service) GetEnvironmentMap() map[string]string {
 			}
 		}
 	}
-	
+
 	return env
 }
 
@@ -296,7 +296,7 @@ func (c *ComposeFile) Validate() error {
 		if service.Image == "" && service.Build == nil {
 			return fmt.Errorf("service '%s' must specify either 'image' or 'build'", name)
 		}
-		
+
 		// Validate port mappings
 		for _, port := range service.Ports {
 			if !isValidPortMapping(port) {
@@ -313,7 +313,7 @@ func isValidPortMapping(port string) bool {
 	if len(parts) < 1 || len(parts) > 3 {
 		return false
 	}
-	
+
 	for _, part := range parts {
 		if portPart := strings.Split(part, "/")[0]; portPart != "" {
 			if _, err := strconv.Atoi(portPart); err != nil {
@@ -321,6 +321,6 @@ func isValidPortMapping(port string) bool {
 			}
 		}
 	}
-	
+
 	return true
 }

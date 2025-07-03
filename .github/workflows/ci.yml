@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop]
+
+jobs:
+  validate-pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}" 
+            doesn't match the configured pattern. Please ensure that the subject 
+            doesn't start with an uppercase character.
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.1'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Check formatting
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "The following files are not formatted correctly:"
+            gofmt -s -l .
+            exit 1
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.1'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build binary
+        run: |
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev-${{ github.sha }}")
+          COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          
+          LDFLAGS="-X main.Version=$VERSION -X main.Commit=$COMMIT -X main.BuildTime=$BUILD_TIME"
+          
+          echo "Building with:"
+          echo "  Version: $VERSION"
+          echo "  Commit: $COMMIT"
+          echo "  Build Time: $BUILD_TIME"
+          
+          mkdir -p bin
+          go build -ldflags "$LDFLAGS" -o bin/dockdockgo main.go
+
+      - name: Test binary
+        run: |
+          chmod +x bin/dockdockgo
+          ./bin/dockdockgo --version
+          ./bin/dockdockgo --help
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockdockgo-linux-amd64
+          path: bin/dockdockgo
+          retention-days: 7

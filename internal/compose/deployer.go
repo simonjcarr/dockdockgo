@@ -96,21 +96,21 @@ func (d *Deployer) getEnvironmentSlice(service *Service) []string {
 func (d *Deployer) calculateDeployOrder(compose *ComposeFile) ([]string, error) {
 	// Simple implementation - can be enhanced with proper dependency resolution
 	order := make([]string, 0, len(compose.Services))
-	
+
 	// First pass: services without dependencies
 	for name, service := range compose.Services {
 		if !d.hasDependencies(service) {
 			order = append(order, name)
 		}
 	}
-	
+
 	// Second pass: services with dependencies
 	for name, service := range compose.Services {
 		if d.hasDependencies(service) {
 			order = append(order, name)
 		}
 	}
-	
+
 	return order, nil
 }
 
@@ -129,46 +129,46 @@ func (d *Deployer) hasDependencies(service *Service) bool {
 
 func (d *Deployer) Stop(compose *ComposeFile) error {
 	fmt.Printf("Stopping project: %s\n", d.projectName)
-	
+
 	// Stop services in reverse order
 	deployOrder, err := d.calculateDeployOrder(compose)
 	if err != nil {
 		return fmt.Errorf("failed to calculate deployment order: %w", err)
 	}
-	
+
 	// Reverse the order for stopping
 	for i := len(deployOrder) - 1; i >= 0; i-- {
 		serviceName := deployOrder[i]
 		service := compose.Services[serviceName]
 		containerName := d.getContainerName(serviceName, service)
-		
+
 		fmt.Printf("Stopping service: %s (container: %s)\n", serviceName, containerName)
 		// TODO: Implement container stop via orchestrator
 	}
-	
+
 	fmt.Printf("✓ Project %s stopped\n", d.projectName)
 	return nil
 }
 
 func (d *Deployer) Remove(compose *ComposeFile) error {
 	fmt.Printf("Removing project: %s\n", d.projectName)
-	
+
 	// Remove services in reverse order
 	deployOrder, err := d.calculateDeployOrder(compose)
 	if err != nil {
 		return fmt.Errorf("failed to calculate deployment order: %w", err)
 	}
-	
+
 	// Reverse the order for removal
 	for i := len(deployOrder) - 1; i >= 0; i-- {
 		serviceName := deployOrder[i]
 		service := compose.Services[serviceName]
 		containerName := d.getContainerName(serviceName, service)
-		
+
 		fmt.Printf("Removing service: %s (container: %s)\n", serviceName, containerName)
 		// TODO: Implement container removal via orchestrator
 	}
-	
+
 	fmt.Printf("✓ Project %s removed\n", d.projectName)
 	return nil
 }

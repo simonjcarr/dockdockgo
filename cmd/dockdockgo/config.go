@@ -19,13 +19,13 @@ var configInitCmd = &cobra.Command{
 	Short: "Initialize configuration file",
 	Run: func(cmd *cobra.Command, args []string) {
 		configPath, _ := cmd.Flags().GetString("config")
-		
+
 		cfg := config.Get()
 		if err := config.Save(cfg, configPath); err != nil {
 			fmt.Printf("Failed to initialize config: %v\n", err)
 			return
 		}
-		
+
 		if configPath == "" {
 			configPath = "~/.dockdockgo/config.yaml"
 		}
@@ -38,13 +38,13 @@ var configShowCmd = &cobra.Command{
 	Short: "Show current configuration",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Get()
-		
+
 		data, err := yaml.Marshal(cfg)
 		if err != nil {
 			fmt.Printf("Failed to marshal config: %v\n", err)
 			return
 		}
-		
+
 		fmt.Print(string(data))
 	},
 }
@@ -67,20 +67,20 @@ var configServerAddCmd = &cobra.Command{
 		password, _ := cmd.Flags().GetString("password")
 		dockerHost, _ := cmd.Flags().GetString("docker-host")
 		maxReplicas, _ := cmd.Flags().GetInt("max-replicas")
-		
+
 		if host == "" {
 			fmt.Println("Error: --host is required")
 			return
 		}
-		
+
 		cfg := config.Get()
-		
+
 		// Check if server already exists
 		if _, exists := cfg.GetServer(name); exists {
 			fmt.Printf("Server '%s' already exists. Use 'config server update' to modify.\n", name)
 			return
 		}
-		
+
 		server := &config.ServerConfig{
 			Host:        host,
 			Port:        port,
@@ -91,15 +91,15 @@ var configServerAddCmd = &cobra.Command{
 			MaxReplicas: maxReplicas,
 			Labels:      make(map[string]string),
 		}
-		
+
 		cfg.AddServer(name, server)
-		
+
 		configPath, _ := cmd.Flags().GetString("config")
 		if err := config.Save(cfg, configPath); err != nil {
 			fmt.Printf("Failed to save config: %v\n", err)
 			return
 		}
-		
+
 		fmt.Printf("✓ Server '%s' added successfully\n", name)
 	},
 }
@@ -110,15 +110,15 @@ var configServerListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Get()
 		servers := cfg.ListServers()
-		
+
 		if len(servers) == 0 {
 			fmt.Println("No servers configured")
 			return
 		}
-		
+
 		fmt.Printf("%-15s %-20s %-10s %-15s\n", "NAME", "HOST", "PORT", "USER")
 		fmt.Println("------------------------------------------------------------")
-		
+
 		for _, name := range servers {
 			server, _ := cfg.GetServer(name)
 			port := server.Port
@@ -137,20 +137,20 @@ var configServerRemoveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		cfg := config.Get()
-		
+
 		if _, exists := cfg.GetServer(name); !exists {
 			fmt.Printf("Server '%s' does not exist\n", name)
 			return
 		}
-		
+
 		cfg.RemoveServer(name)
-		
+
 		configPath, _ := cmd.Flags().GetString("config")
 		if err := config.Save(cfg, configPath); err != nil {
 			fmt.Printf("Failed to save config: %v\n", err)
 			return
 		}
-		
+
 		fmt.Printf("✓ Server '%s' removed successfully\n", name)
 	},
 }
@@ -160,14 +160,14 @@ func init() {
 	configCmd.AddCommand(configInitCmd)
 	configCmd.AddCommand(configShowCmd)
 	configCmd.AddCommand(configServerCmd)
-	
+
 	configServerCmd.AddCommand(configServerAddCmd)
 	configServerCmd.AddCommand(configServerListCmd)
 	configServerCmd.AddCommand(configServerRemoveCmd)
-	
+
 	// Global config flag
 	configCmd.PersistentFlags().StringP("config", "c", "", "Configuration file path")
-	
+
 	// Server add flags
 	configServerAddCmd.Flags().StringP("host", "H", "", "Server hostname or IP address (required)")
 	configServerAddCmd.Flags().StringP("port", "p", "22", "SSH port")
@@ -176,6 +176,6 @@ func init() {
 	configServerAddCmd.Flags().StringP("password", "", "", "SSH password")
 	configServerAddCmd.Flags().StringP("docker-host", "", "", "Docker daemon host")
 	configServerAddCmd.Flags().IntP("max-replicas", "", 10, "Maximum replicas for this server")
-	
+
 	configServerAddCmd.MarkFlagRequired("host")
 }

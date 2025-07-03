@@ -20,15 +20,15 @@ type Client struct {
 }
 
 type ContainerConfig struct {
-	Image        string
-	Name         string
-	Ports        []string
-	Environment  []string
-	Volumes      []string
-	WorkingDir   string
-	Entrypoint   []string
-	Cmd          []string
-	Detach       bool
+	Image         string
+	Name          string
+	Ports         []string
+	Environment   []string
+	Volumes       []string
+	WorkingDir    string
+	Entrypoint    []string
+	Cmd           []string
+	Detach        bool
 	RestartPolicy string
 }
 

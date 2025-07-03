@@ -111,7 +111,7 @@ func init() {
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(rmCmd)
 	rootCmd.AddCommand(restartCmd)
-	
+
 	stopCmd.Flags().StringSliceP("servers", "s", []string{}, "Stop containers on remote servers")
 	rmCmd.Flags().StringSliceP("servers", "s", []string{}, "Remove containers on remote servers")
 	rmCmd.Flags().BoolP("force", "f", false, "Force removal of running containers")

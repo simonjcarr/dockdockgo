@@ -70,7 +70,7 @@ func listLocalContainers(all bool) error {
 
 func init() {
 	rootCmd.AddCommand(psCmd)
-	
+
 	psCmd.Flags().BoolP("all", "a", false, "Show all containers (default shows just running)")
 	psCmd.Flags().StringSliceP("servers", "s", []string{}, "List containers on remote servers")
 }

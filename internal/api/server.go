@@ -33,7 +33,7 @@ func NewServer(host, port string) *Server {
 
 func (s *Server) setupRoutes() {
 	api := s.router.PathPrefix("/api/v1").Subrouter()
-	
+
 	api.HandleFunc("/containers", s.handleContainers).Methods("GET", "POST")
 	api.HandleFunc("/containers/{id}", s.handleContainer).Methods("GET", "DELETE")
 	api.HandleFunc("/images/search", s.handleImageSearch).Methods("GET")
@@ -59,7 +59,7 @@ func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleContainer(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	
+
 	switch r.Method {
 	case "GET":
 		s.sendJSON(w, Response{Success: true, Data: fmt.Sprintf("Container: %s", id)})

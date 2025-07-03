@@ -148,7 +148,7 @@ func init() {
 	rootCmd.AddCommand(imagesCmd)
 	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(rmiCmd)
-	
+
 	imagesCmd.Flags().StringSliceP("servers", "s", []string{}, "List images on remote servers")
 	pullCmd.Flags().StringSliceP("servers", "s", []string{}, "Pull image to remote servers")
 	rmiCmd.Flags().StringSliceP("servers", "s", []string{}, "Remove images from remote servers")

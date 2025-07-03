@@ -98,7 +98,13 @@ jobs:
 
       - name: Build binary
         run: |
-          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev-${{ github.sha }}")
+          # Use same version logic as build.sh
+          VERSION=$(git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo "")
+          if [ -z "$VERSION" ]; then
+            VERSION="dev-${{ github.sha }}"
+          else
+            VERSION=$(echo "$VERSION" | sed 's/^v//')
+          fi
           COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
           BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
           

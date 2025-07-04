@@ -148,7 +148,7 @@ func (s *Server) Close() error {
 			log.Printf("Error stopping sync manager: %v", err)
 		}
 	}
-	
+
 	// Close the connection manager instead of individual storage
 	return storage.GetInstance().Close()
 }

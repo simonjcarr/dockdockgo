@@ -335,7 +335,7 @@ func (s *Scheduler) scheduleLocalFirst(nodes []*types.Node, container *types.Con
 		}
 	}
 
-	// If local node not available or doesn't have capacity, 
+	// If local node not available or doesn't have capacity,
 	// warn user and fallback to spread strategy
 	fmt.Printf("⚠️  Local node %s not available or at capacity, scheduling to remote node (containers may fail)\n", currentHostname)
 	return s.scheduleSpread(nodes, container)

@@ -54,6 +54,21 @@ check_dependencies() {
             exit 1
         fi
     done
+    
+    # Check if Docker is installed
+    if ! command -v docker &> /dev/null; then
+        log_error "Docker is not installed. Please install Docker first:"
+        log_error "  curl -fsSL https://get.docker.com | sh"
+        exit 1
+    fi
+    
+    # Check if Docker daemon is running
+    if ! docker info &> /dev/null; then
+        log_error "Docker daemon is not running. Please start Docker:"
+        log_error "  sudo systemctl start docker"
+        log_error "  sudo systemctl enable docker"
+        exit 1
+    fi
 }
 
 detect_architecture() {
@@ -149,6 +164,11 @@ create_user() {
     if ! id "$BINARY_NAME" &>/dev/null; then
         log_info "Creating dockdockgo user..."
         useradd --system --shell /bin/false --home-dir "$DATA_DIR" --create-home "$BINARY_NAME"
+        log_info "Adding dockdockgo user to docker group..."
+        usermod -aG docker "$BINARY_NAME"
+    else
+        log_info "Ensuring dockdockgo user is in docker group..."
+        usermod -aG docker "$BINARY_NAME"
     fi
 }
 

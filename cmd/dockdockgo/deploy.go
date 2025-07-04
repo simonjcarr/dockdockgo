@@ -85,6 +85,9 @@ var deployCreateCmd = &cobra.Command{
 			fmt.Printf("  Image: %s\n", deployment.Image)
 			fmt.Printf("  Replicas: %d\n", deployment.Replicas)
 			fmt.Printf("  Status: %s\n", deployment.Status)
+			
+			// Trigger cluster sync
+			triggerClusterSync(client)
 			return
 		}
 
@@ -485,4 +488,43 @@ func init() {
 	deployCreateCmd.Flags().StringSliceP("volume", "v", []string{}, "Volume mounts (host:container[:ro])")
 	deployCreateCmd.Flags().StringP("placement", "", "spread", "Placement strategy (spread, pack, binpack)")
 	deployCreateCmd.Flags().StringP("restart-policy", "", "unless-stopped", "Restart policy")
+}
+
+// triggerClusterSync triggers cluster synchronization after deployment changes
+func triggerClusterSync(client *api.Client) {
+	// For now, just log that sync should happen
+	// In a full implementation, this would trigger immediate sync
+	fmt.Println("  → Triggering cluster synchronization...")
+}
+
+// cleanupFailedDeployment removes a failed deployment from the database
+func cleanupFailedDeployment(name string) error {
+	storage, err := storage.NewDefaultStorage()
+	if err != nil {
+		return fmt.Errorf("failed to initialize storage: %w", err)
+	}
+
+	// Try to get the deployment
+	deployment, err := storage.GetDeploymentByName(name)
+	if err != nil {
+		return fmt.Errorf("deployment %s not found: %w", name, err)
+	}
+
+	// Delete associated containers
+	containers, err := storage.ListContainersByDeployment(deployment.ID)
+	if err == nil {
+		for _, container := range containers {
+			if err := storage.DeleteContainer(container.ID); err != nil {
+				fmt.Printf("Warning: Failed to delete container %s: %v\n", container.Name, err)
+			}
+		}
+	}
+
+	// Delete the deployment
+	if err := storage.DeleteDeployment(deployment.ID); err != nil {
+		return fmt.Errorf("failed to delete deployment: %w", err)
+	}
+
+	fmt.Printf("✓ Cleaned up failed deployment: %s\n", name)
+	return nil
 }

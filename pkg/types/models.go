@@ -38,6 +38,20 @@ const (
 	NodeFailed   NodeStatus = "failed"
 )
 
+// NodeRole represents a node's role in the cluster
+type NodeRole string
+
+const (
+	NodeRoleMaster NodeRole = "master"
+	NodeRoleWorker NodeRole = "worker"
+)
+
+// For backward compatibility
+const (
+	NodeStatusOnline  = NodeOnline
+	NodeStatusOffline = NodeOffline
+)
+
 // HealthStatus represents the health state of a container
 type HealthStatus string
 
@@ -93,7 +107,7 @@ type Node struct {
 	IPAddress     string            `json:"ip_address"`
 	Port          int               `json:"port"`
 	Status        NodeStatus        `json:"status"`
-	Role          string            `json:"role"` // master, worker
+	Role          NodeRole          `json:"role"` // master, worker
 	Version       string            `json:"version"`
 	Labels        map[string]string `json:"labels,omitempty"`
 	Resources     *NodeResources    `json:"resources,omitempty"`

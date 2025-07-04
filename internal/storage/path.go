@@ -51,8 +51,7 @@ func getDevelopmentDatabasePath() string {
 	return "./dockdockgo.db"
 }
 
-// NewDefaultStorage creates a new storage instance with the appropriate database path
+// NewDefaultStorage creates a new storage instance using the connection manager
 func NewDefaultStorage() (*Storage, error) {
-	dbPath := GetDatabasePath()
-	return NewStorage(dbPath)
+	return NewManagedStorage()
 }

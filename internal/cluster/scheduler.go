@@ -5,6 +5,7 @@ import (
 	"dockdockgo/pkg/types"
 	"fmt"
 	"math"
+	"os"
 	"strings"
 )
 
@@ -51,8 +52,11 @@ func (s *Scheduler) ScheduleContainer(container *types.Container, placement *typ
 		selectedNode = s.schedulePack(nodes, container)
 	case "binpack":
 		selectedNode = s.scheduleBinPack(nodes, container)
+	case "local-first":
+		selectedNode = s.scheduleLocalFirst(nodes, container)
 	default:
-		selectedNode = s.scheduleSpread(nodes, container)
+		// Use local-first as default since remote execution is not implemented
+		selectedNode = s.scheduleLocalFirst(nodes, container)
 	}
 
 	if selectedNode == nil {
@@ -313,4 +317,26 @@ func (s *Scheduler) getContainerCountsPerNode() map[string]int {
 	}
 
 	return counts
+}
+
+// Local-first strategy: prefer local node, fallback to remote nodes
+func (s *Scheduler) scheduleLocalFirst(nodes []*types.Node, container *types.Container) *types.Node {
+	// Get current hostname
+	currentHostname, err := os.Hostname()
+	if err != nil {
+		// If we can't get hostname, fallback to spread strategy
+		return s.scheduleSpread(nodes, container)
+	}
+
+	// First, try to find the local node
+	for _, node := range nodes {
+		if node.Hostname == currentHostname && s.hasCapacity(node, container) {
+			return node
+		}
+	}
+
+	// If local node not available or doesn't have capacity, 
+	// warn user and fallback to spread strategy
+	fmt.Printf("⚠️  Local node %s not available or at capacity, scheduling to remote node (containers may fail)\n", currentHostname)
+	return s.scheduleSpread(nodes, container)
 }

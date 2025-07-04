@@ -21,11 +21,13 @@ import (
 )
 
 type Server struct {
-	router  *mux.Router
-	port    string
-	host    string
-	storage *storage.Storage
-	server  *http.Server
+	router      *mux.Router
+	port        string
+	host        string
+	storage     *storage.Storage
+	server      *http.Server
+	syncManager *cluster.SyncManager
+	currentNode *types.Node
 }
 
 type Response struct {
@@ -95,6 +97,11 @@ func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 	log.Printf("Starting API server on %s", addr)
 
+	// Initialize sync manager if we have a current node
+	if err := s.initializeSyncManager(); err != nil {
+		log.Printf("Failed to initialize sync manager: %v", err)
+	}
+
 	// Create HTTP server
 	s.server = &http.Server{
 		Addr:    addr,
@@ -135,8 +142,49 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Close() error {
+	// Stop sync manager if running
+	if s.syncManager != nil {
+		if err := s.syncManager.Stop(); err != nil {
+			log.Printf("Error stopping sync manager: %v", err)
+		}
+	}
+	
 	// Close the connection manager instead of individual storage
 	return storage.GetInstance().Close()
+}
+
+func (s *Server) initializeSyncManager() error {
+	// Get current hostname to find our node
+	hostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	// Try to find the current node in storage
+	nodes, err := s.storage.ListNodes()
+	if err != nil {
+		return fmt.Errorf("failed to list nodes: %w", err)
+	}
+
+	for _, node := range nodes {
+		if node.Hostname == hostname {
+			s.currentNode = node
+			break
+		}
+	}
+
+	// Only start sync manager if we found our node
+	if s.currentNode != nil {
+		s.syncManager = cluster.NewSyncManager(s.storage, s.currentNode)
+		if err := s.syncManager.Start(); err != nil {
+			return fmt.Errorf("failed to start sync manager: %w", err)
+		}
+		log.Printf("Cluster sync manager started for node %s", s.currentNode.Hostname)
+	} else {
+		log.Printf("Current node not found in cluster - sync manager not started")
+	}
+
+	return nil
 }
 
 func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
@@ -579,8 +627,23 @@ func (s *Server) handleGetClusterSync(w http.ResponseWriter, r *http.Request) {
 	s.sendJSON(w, Response{Success: true, Data: syncData})
 }
 
-// handlePostClusterSync receives and applies cluster state from master
+// handlePostClusterSync receives and applies cluster state from master or triggers sync
 func (s *Server) handlePostClusterSync(w http.ResponseWriter, r *http.Request) {
+	// Check if there's a body (sync data) or just a trigger request
+	if r.ContentLength == 0 {
+		// This is a trigger sync request
+		if s.syncManager != nil {
+			if err := s.syncManager.SyncOnDemand(); err != nil {
+				s.sendError(w, fmt.Sprintf("Failed to trigger sync: %v", err), http.StatusInternalServerError)
+				return
+			}
+			s.sendJSON(w, Response{Success: true, Data: "Cluster sync triggered successfully"})
+		} else {
+			s.sendError(w, "Sync manager not available", http.StatusServiceUnavailable)
+		}
+		return
+	}
+
 	var syncData struct {
 		Timestamp   time.Time           `json:"timestamp"`
 		Deployments []*types.Deployment `json:"deployments"`

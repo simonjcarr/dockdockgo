@@ -25,23 +25,23 @@ NC='\033[0m' # No Color
 
 # Functions
 log_info() {
-    echo -e "${BLUE}🔄 [INFO]${NC} $1"
+    printf "${BLUE}🔄 [INFO]${NC} %s\n" "$1" >&2
 }
 
 log_success() {
-    echo -e "${GREEN}✅ [SUCCESS]${NC} $1"
+    printf "${GREEN}✅ [SUCCESS]${NC} %s\n" "$1" >&2
 }
 
 log_warning() {
-    echo -e "${YELLOW}⚠️  [WARNING]${NC} $1"
+    printf "${YELLOW}⚠️  [WARNING]${NC} %s\n" "$1" >&2
 }
 
 log_error() {
-    echo -e "${RED}❌ [ERROR]${NC} $1"
+    printf "${RED}❌ [ERROR]${NC} %s\n" "$1" >&2
 }
 
 check_root() {
-    if [ $EUID -ne 0 ]; then
+    if [ "$(id -u)" -ne 0 ]; then
         log_error "This script must be run as root (use sudo)"
         exit 1
     fi
@@ -278,8 +278,8 @@ verify_installation() {
 }
 
 main() {
-    echo "🚀 DockDockGo Fresh Deployment Script"
-    echo "======================================"
+    echo "🚀 DockDockGo Fresh Deployment Script" >&2
+    echo "======================================" >&2
     
     # Pre-flight checks
     check_root
@@ -295,13 +295,13 @@ main() {
     download_and_install "$latest_version"
     
     if verify_installation; then
-        echo ""
+        echo "" >&2
         log_success "🎉 Deployment completed successfully!"
         log_info "📋 Version: $("$INSTALL_DIR/$BINARY_NAME" -v 2>/dev/null | head -1)"
         log_info "🟢 Service: $(systemctl is-active dockdockgo)"
         log_info "🌐 API: http://localhost:8080"
-        echo ""
-        echo "Ready to test! Try: dockdockgo server list"
+        echo "" >&2
+        echo "Ready to test! Try: dockdockgo server list" >&2
     else
         log_error "❌ Deployment completed but verification failed"
         log_info "Check service status: sudo systemctl status dockdockgo"

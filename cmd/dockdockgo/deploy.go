@@ -85,7 +85,7 @@ var deployCreateCmd = &cobra.Command{
 			fmt.Printf("  Image: %s\n", deployment.Image)
 			fmt.Printf("  Replicas: %d\n", deployment.Replicas)
 			fmt.Printf("  Status: %s\n", deployment.Status)
-			
+
 			// Trigger cluster sync
 			triggerClusterSync(client)
 			return

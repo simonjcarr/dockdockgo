@@ -94,43 +94,43 @@ func (s *Server) setupRoutes() {
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 	log.Printf("Starting API server on %s", addr)
-	
+
 	// Create HTTP server
 	s.server = &http.Server{
 		Addr:    addr,
 		Handler: s.router,
 	}
-	
+
 	// Setup graceful shutdown
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		
+
 		log.Println("Shutting down API server...")
-		
+
 		// Create a context with timeout for shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		
+
 		// Shutdown the server gracefully
 		if err := s.server.Shutdown(ctx); err != nil {
 			log.Printf("Error during server shutdown: %v", err)
 		}
-		
+
 		// Close database connection
 		if err := s.Close(); err != nil {
 			log.Printf("Error closing database: %v", err)
 		}
-		
+
 		log.Println("API server stopped")
 	}()
-	
+
 	// Start the server
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -612,7 +612,7 @@ func (s *Server) handlePostClusterSync(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Printf("Applied sync data with %d deployments, %d containers, %d nodes", 
+	log.Printf("Applied sync data with %d deployments, %d containers, %d nodes",
 		len(syncData.Deployments), len(syncData.Containers), len(syncData.Nodes))
 
 	s.sendJSON(w, Response{Success: true, Data: "Sync data applied successfully"})

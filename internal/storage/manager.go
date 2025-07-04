@@ -106,17 +106,17 @@ func (cm *ConnectionManager) Reset() error {
 // WaitForConnection waits for a database connection to become available
 func (cm *ConnectionManager) WaitForConnection(timeout time.Duration) (*Storage, error) {
 	deadline := time.Now().Add(timeout)
-	
+
 	for time.Now().Before(deadline) {
 		storage, err := cm.GetStorage()
 		if err == nil {
 			return storage, nil
 		}
-		
+
 		// Wait a bit before retrying
 		time.Sleep(100 * time.Millisecond)
 	}
-	
+
 	return nil, &ConnectionTimeoutError{Timeout: timeout}
 }
 

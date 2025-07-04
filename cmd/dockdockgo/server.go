@@ -84,7 +84,7 @@ var serverAddCmd = &cobra.Command{
 					IPAddress:     hostname, // TODO: Resolve IP address
 					Port:          port,
 					Status:        types.NodeOffline,
-					Role: types.NodeRole(role),
+					Role:          types.NodeRole(role),
 					Version:       "1.0.0", // TODO: Get actual version
 					Labels:        nodeLabels,
 					LastHeartbeat: time.Now(),
@@ -515,7 +515,7 @@ var clusterJoinCmd = &cobra.Command{
 				IPAddress:     hostname, // TODO: Get actual IP
 				Port:          8443,
 				Status:        types.NodeOnline,
-				Role: types.NodeRole(role),
+				Role:          types.NodeRole(role),
 				Version:       "1.0.0", // TODO: Get actual version
 				Labels:        map[string]string{"cluster.role": role},
 				LastHeartbeat: time.Now(),

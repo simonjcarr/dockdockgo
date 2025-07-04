@@ -236,7 +236,7 @@ func (dm *DeploymentManager) scheduleContainers(deployment *types.Deployment, co
 			fmt.Printf("❌ Failed to start container %s: %v\n", container.Name, err)
 			container.Status = types.ContainerFailed
 			dm.storage.SaveContainer(container)
-			
+
 			// Return error on first failure to provide immediate feedback
 			return fmt.Errorf("failed to start container %s: %w", container.Name, err)
 		}

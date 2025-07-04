@@ -15,11 +15,11 @@ import (
 
 // SyncManager handles cluster state synchronization
 type SyncManager struct {
-	storage   *storage.Storage
+	storage     *storage.Storage
 	currentNode *types.Node
-	isRunning bool
-	stopChan  chan struct{}
-	mu        sync.RWMutex
+	isRunning   bool
+	stopChan    chan struct{}
+	mu          sync.RWMutex
 }
 
 // NewSyncManager creates a new cluster sync manager
@@ -42,7 +42,7 @@ func (sm *SyncManager) Start() error {
 
 	sm.isRunning = true
 	go sm.syncLoop()
-	
+
 	log.Println("Cluster sync manager started")
 	return nil
 }
@@ -58,7 +58,7 @@ func (sm *SyncManager) Stop() error {
 
 	close(sm.stopChan)
 	sm.isRunning = false
-	
+
 	log.Println("Cluster sync manager stopped")
 	return nil
 }
@@ -158,7 +158,7 @@ func (sm *SyncManager) pullStateFromMaster(nodes []*types.Node) error {
 // sendSyncData sends sync data to a specific node
 func (sm *SyncManager) sendSyncData(node *types.Node, data *ClusterSyncData) error {
 	url := fmt.Sprintf("http://%s:%d/api/v1/cluster/sync", node.IPAddress, node.Port)
-	
+
 	payload, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal sync data: %w", err)
@@ -191,7 +191,7 @@ func (sm *SyncManager) sendSyncData(node *types.Node, data *ClusterSyncData) err
 // requestSyncData requests sync data from master node
 func (sm *SyncManager) requestSyncData(masterNode *types.Node) (*ClusterSyncData, error) {
 	url := fmt.Sprintf("http://%s:%d/api/v1/cluster/sync", masterNode.IPAddress, masterNode.Port)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -242,9 +242,9 @@ func (sm *SyncManager) applySyncData(data *ClusterSyncData) error {
 		}
 	}
 
-	log.Printf("Applied sync data with %d deployments, %d containers, %d nodes", 
+	log.Printf("Applied sync data with %d deployments, %d containers, %d nodes",
 		len(data.Deployments), len(data.Containers), len(data.Nodes))
-	
+
 	return nil
 }
 

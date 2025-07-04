@@ -1,23 +1,34 @@
 package cluster
 
 import (
+	"dockdockgo/internal/docker"
 	"dockdockgo/internal/storage"
 	"dockdockgo/pkg/types"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type DeploymentManager struct {
-	storage   *storage.Storage
-	scheduler *Scheduler
+	storage      *storage.Storage
+	scheduler    *Scheduler
+	dockerClient *docker.Client
 }
 
 func NewDeploymentManager(storage *storage.Storage) *DeploymentManager {
+	dockerClient, err := docker.NewClient()
+	if err != nil {
+		// Log error but continue - we'll handle this when scheduling containers
+		fmt.Printf("Warning: Failed to create Docker client: %v\n", err)
+	}
+
 	return &DeploymentManager{
-		storage:   storage,
-		scheduler: NewScheduler(storage),
+		storage:      storage,
+		scheduler:    NewScheduler(storage),
+		dockerClient: dockerClient,
 	}
 }
 
@@ -213,8 +224,15 @@ func (dm *DeploymentManager) scheduleContainers(deployment *types.Deployment, co
 		// Add container to deployment
 		deployment.Containers[container.ID] = container
 
-		// TODO: Send container start command to worker node via gRPC
-		fmt.Printf("Scheduled container %s to node %s\n", container.Name, node.Hostname)
+		// Start the container
+		if err := dm.startContainer(container, deployment, node); err != nil {
+			fmt.Printf("Warning: Failed to start container %s: %v\n", container.Name, err)
+			container.Status = types.ContainerFailed
+			dm.storage.SaveContainer(container)
+			continue
+		}
+
+		fmt.Printf("Successfully started container %s on node %s\n", container.Name, node.Hostname)
 	}
 
 	return nil
@@ -286,8 +304,34 @@ func (dm *DeploymentManager) removeContainers(deployment *types.Deployment, coun
 }
 
 func (dm *DeploymentManager) stopContainer(container *types.Container) error {
-	// TODO: Send container stop command to worker node via gRPC
 	fmt.Printf("Stopping container %s on node %s\n", container.Name, container.NodeID)
+
+	// Get current hostname to check if container is on local node
+	currentHostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	// Get node info
+	node, err := dm.storage.GetNode(container.NodeID)
+	if err != nil {
+		return fmt.Errorf("failed to get node: %w", err)
+	}
+
+	// Stop container if it's on the local node
+	if node.Hostname == currentHostname {
+		if dm.dockerClient != nil && container.DockerID != "" {
+			if err := dm.dockerClient.StopContainer(container.DockerID); err != nil {
+				fmt.Printf("Warning: Failed to stop Docker container %s: %v\n", container.DockerID, err)
+			}
+			if err := dm.dockerClient.RemoveContainer(container.DockerID, true); err != nil {
+				fmt.Printf("Warning: Failed to remove Docker container %s: %v\n", container.DockerID, err)
+			}
+		}
+	} else {
+		// TODO: Send container stop command to worker node via gRPC
+		fmt.Printf("TODO: Stop container %s on remote node %s\n", container.Name, node.Hostname)
+	}
 
 	container.Status = types.ContainerStopped
 	now := time.Now()
@@ -331,6 +375,90 @@ func (dm *DeploymentManager) UpdateContainerStatus(containerID string, event *ty
 
 	// Update deployment status
 	return dm.updateDeploymentStatus(container.DeploymentID)
+}
+
+func (dm *DeploymentManager) startContainer(container *types.Container, deployment *types.Deployment, node *types.Node) error {
+	// Get current hostname to check if container should be started locally
+	currentHostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	// Start container if it's on the local node
+	if node.Hostname == currentHostname {
+		if dm.dockerClient == nil {
+			return fmt.Errorf("Docker client not available")
+		}
+
+		// Pull image if needed
+		if err := dm.dockerClient.PullImage(deployment.Image); err != nil {
+			fmt.Printf("Warning: Failed to pull image %s: %v\n", deployment.Image, err)
+			// Continue anyway - image might already exist locally
+		}
+
+		// Prepare container configuration
+		dockerConfig := &docker.ContainerConfig{
+			Image:         deployment.Image,
+			Name:          container.Name,
+			Ports:         dm.convertPortMappings(container.Ports),
+			Environment:   dm.convertEnvironmentMap(deployment.Environment),
+			Volumes:       dm.convertVolumeMappings(deployment.Volumes),
+			Entrypoint:    deployment.Entrypoint,
+			Cmd:           deployment.Command,
+			RestartPolicy: deployment.RestartPolicy,
+		}
+
+		// Start the container
+		dockerContainerID, err := dm.dockerClient.RunContainer(dockerConfig)
+		if err != nil {
+			return fmt.Errorf("failed to start Docker container: %w", err)
+		}
+
+		// Update container with Docker container ID and running status
+		container.DockerID = dockerContainerID
+		container.Status = types.ContainerRunning
+		now := time.Now()
+		container.StartedAt = &now
+		container.LastHeartbeat = now
+
+		return dm.storage.SaveContainer(container)
+	} else {
+		// TODO: Send container start command to worker node via gRPC
+		fmt.Printf("TODO: Start container %s on remote node %s\n", container.Name, node.Hostname)
+		// For now, mark as failed since we can't start on remote nodes
+		container.Status = types.ContainerFailed
+		return dm.storage.SaveContainer(container)
+	}
+}
+
+func (dm *DeploymentManager) convertPortMappings(ports []types.PortMapping) []string {
+	var portStrings []string
+	for _, port := range ports {
+		if port.HostPort > 0 {
+			portStrings = append(portStrings, strconv.Itoa(port.HostPort)+":"+strconv.Itoa(port.ContainerPort))
+		}
+	}
+	return portStrings
+}
+
+func (dm *DeploymentManager) convertEnvironmentMap(env map[string]string) []string {
+	var envStrings []string
+	for key, value := range env {
+		envStrings = append(envStrings, key+"="+value)
+	}
+	return envStrings
+}
+
+func (dm *DeploymentManager) convertVolumeMappings(volumes []types.VolumeMapping) []string {
+	var volumeStrings []string
+	for _, volume := range volumes {
+		volumeStr := volume.HostPath + ":" + volume.ContainerPath
+		if volume.ReadOnly {
+			volumeStr += ":ro"
+		}
+		volumeStrings = append(volumeStrings, volumeStr)
+	}
+	return volumeStrings
 }
 
 func (dm *DeploymentManager) updateDeploymentStatus(deploymentID string) error {

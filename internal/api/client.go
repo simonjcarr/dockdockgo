@@ -129,3 +129,122 @@ func (c *Client) ListNodes() ([]*types.Node, error) {
 
 	return nodes, nil
 }
+
+func (c *Client) CreateDeployment(spec *types.DeploymentSpec) (*types.Deployment, error) {
+	body, err := json.Marshal(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal deployment spec: %w", err)
+	}
+
+	resp, err := c.httpClient.Post(c.baseURL+"/deployments", "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var response Response
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API error: %s", response.Error)
+	}
+
+	// Convert response.Data to Deployment
+	dataBytes, err := json.Marshal(response.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response data: %w", err)
+	}
+
+	var deployment types.Deployment
+	if err := json.Unmarshal(dataBytes, &deployment); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal deployment: %w", err)
+	}
+
+	return &deployment, nil
+}
+
+func (c *Client) ListDeployments() ([]*types.Deployment, error) {
+	resp, err := c.httpClient.Get(c.baseURL + "/deployments")
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var response Response
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API error: %s", response.Error)
+	}
+
+	// Convert response.Data to []*Deployment
+	dataBytes, err := json.Marshal(response.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response data: %w", err)
+	}
+
+	var deployments []*types.Deployment
+	if err := json.Unmarshal(dataBytes, &deployments); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal deployments: %w", err)
+	}
+
+	return deployments, nil
+}
+
+func (c *Client) GetDeployment(id string) (*types.Deployment, error) {
+	resp, err := c.httpClient.Get(c.baseURL + "/deployments/" + id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var response Response
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API error: %s", response.Error)
+	}
+
+	// Convert response.Data to Deployment
+	dataBytes, err := json.Marshal(response.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response data: %w", err)
+	}
+
+	var deployment types.Deployment
+	if err := json.Unmarshal(dataBytes, &deployment); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal deployment: %w", err)
+	}
+
+	return &deployment, nil
+}
+
+func (c *Client) DeleteDeployment(id string) error {
+	req, err := http.NewRequest("DELETE", c.baseURL+"/deployments/"+id, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to connect to API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var response Response
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("API error: %s", response.Error)
+	}
+
+	return nil
+}

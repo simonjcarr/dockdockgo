@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"dockdockgo/internal/cluster"
 	"dockdockgo/internal/storage"
 	"dockdockgo/pkg/types"
 	"encoding/json"
@@ -73,6 +74,8 @@ func (s *Server) setupRoutes() {
 
 	api.HandleFunc("/containers", s.handleContainers).Methods("GET", "POST")
 	api.HandleFunc("/containers/{id}", s.handleContainer).Methods("GET", "DELETE")
+	api.HandleFunc("/deployments", s.handleDeployments).Methods("GET", "POST")
+	api.HandleFunc("/deployments/{id}", s.handleDeployment).Methods("GET", "DELETE")
 	api.HandleFunc("/images/search", s.handleImageSearch).Methods("GET")
 	api.HandleFunc("/compose", s.handleCompose).Methods("POST")
 	api.HandleFunc("/nodes", s.handleNodes).Methods("GET")
@@ -391,6 +394,61 @@ func (s *Server) registerWithMaster(masterAddr string, node *types.Node) error {
 	}
 
 	return nil
+}
+
+func (s *Server) handleDeployments(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		deployments, err := s.storage.ListDeployments()
+		if err != nil {
+			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to list deployments: %v", err)})
+			return
+		}
+		s.sendJSON(w, Response{Success: true, Data: deployments})
+	case "POST":
+		var spec types.DeploymentSpec
+		if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
+			s.sendJSON(w, Response{Success: false, Error: "Invalid request format"})
+			return
+		}
+
+		// Create deployment using the cluster deployment manager
+		deploymentManager := s.getDeploymentManager()
+		deployment, err := deploymentManager.CreateDeployment(&spec)
+		if err != nil {
+			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to create deployment: %v", err)})
+			return
+		}
+
+		s.sendJSON(w, Response{Success: true, Data: deployment})
+	}
+}
+
+func (s *Server) handleDeployment(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	switch r.Method {
+	case "GET":
+		deployment, err := s.storage.GetDeployment(id)
+		if err != nil {
+			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to get deployment: %v", err)})
+			return
+		}
+		s.sendJSON(w, Response{Success: true, Data: deployment})
+	case "DELETE":
+		deploymentManager := s.getDeploymentManager()
+		err := deploymentManager.DeleteDeployment(id)
+		if err != nil {
+			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to delete deployment: %v", err)})
+			return
+		}
+		s.sendJSON(w, Response{Success: true, Data: fmt.Sprintf("Deployment %s deleted", id)})
+	}
+}
+
+func (s *Server) getDeploymentManager() *cluster.DeploymentManager {
+	return cluster.NewDeploymentManager(s.storage)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

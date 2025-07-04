@@ -280,7 +280,7 @@ func (s *Server) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 		if detectedIP := s.getLocalIPAddress(); detectedIP != "" {
 			nodeIPAddress = detectedIP
 		}
-		
+
 		thisNode = &types.Node{
 			ID:            uuid.New().String(),
 			Hostname:      hostname,

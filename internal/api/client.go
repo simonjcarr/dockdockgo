@@ -286,3 +286,43 @@ func (c *Client) DeleteDeployment(id string) error {
 
 	return nil
 }
+
+func (c *Client) CreateContainer(container *types.Container, deploymentSpec *types.DeploymentSpec) (*types.Container, error) {
+	req := map[string]interface{}{
+		"container":       container,
+		"deployment_spec": deploymentSpec,
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	resp, err := c.httpClient.Post(c.baseURL+"/containers", "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var response Response
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API error: %s", response.Error)
+	}
+
+	// Convert response.Data to Container
+	dataBytes, err := json.Marshal(response.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response data: %w", err)
+	}
+
+	var resultContainer types.Container
+	if err := json.Unmarshal(dataBytes, &resultContainer); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container: %w", err)
+	}
+
+	return &resultContainer, nil
+}

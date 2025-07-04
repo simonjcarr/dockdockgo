@@ -39,7 +39,7 @@ func (s *Scheduler) ScheduleContainer(container *types.Container, placement *typ
 	}
 
 	// Choose scheduling strategy
-	strategy := "spread" // default
+	strategy := "spread" // default to spread for proper multi-node distribution
 	if placement != nil && placement.Strategy != "" {
 		strategy = placement.Strategy
 	}
@@ -55,8 +55,8 @@ func (s *Scheduler) ScheduleContainer(container *types.Container, placement *typ
 	case "local-first":
 		selectedNode = s.scheduleLocalFirst(nodes, container)
 	default:
-		// Use local-first as default since remote execution is not implemented
-		selectedNode = s.scheduleLocalFirst(nodes, container)
+		// Use spread as default for proper multi-node distribution
+		selectedNode = s.scheduleSpread(nodes, container)
 	}
 
 	if selectedNode == nil {
@@ -336,7 +336,7 @@ func (s *Scheduler) scheduleLocalFirst(nodes []*types.Node, container *types.Con
 	}
 
 	// If local node not available or doesn't have capacity,
-	// warn user and fallback to spread strategy
-	fmt.Printf("⚠️  Local node %s not available or at capacity, scheduling to remote node (containers may fail)\n", currentHostname)
+	// warn user and fallback to spread strategy since remote execution is now implemented
+	fmt.Printf("⚠️  Local node %s not available or at capacity, scheduling to remote node\n", currentHostname)
 	return s.scheduleSpread(nodes, container)
 }

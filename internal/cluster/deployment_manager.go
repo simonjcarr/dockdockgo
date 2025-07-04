@@ -1,10 +1,13 @@
 package cluster
 
 import (
+	"bytes"
 	"dockdockgo/internal/docker"
 	"dockdockgo/internal/storage"
 	"dockdockgo/pkg/types"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -440,13 +443,25 @@ func (dm *DeploymentManager) startContainer(container *types.Container, deployme
 
 		return dm.storage.SaveContainer(container)
 	} else {
-		// TODO: Send container start command to worker node via gRPC
-		fmt.Printf("❌ Cannot start container %s on remote node %s (remote execution not implemented)\n", container.Name, node.Hostname)
-		// Mark as failed since we can't start on remote nodes
-		container.Status = types.ContainerFailed
-		dm.storage.SaveContainer(container)
-		// Return error to prevent deployment from being marked as running
-		return fmt.Errorf("remote container execution not implemented for node %s", node.Hostname)
+		// Start container on remote node via API
+		fmt.Printf("🌐 Starting container %s on remote node %s...\n", container.Name, node.Hostname)
+
+		updatedContainer, err := dm.startContainerOnRemoteNode(container, deployment, node)
+		if err != nil {
+			fmt.Printf("❌ Failed to start container %s on remote node %s: %v\n", container.Name, node.Hostname, err)
+			container.Status = types.ContainerFailed
+			dm.storage.SaveContainer(container)
+			return fmt.Errorf("failed to start container on remote node %s: %w", node.Hostname, err)
+		}
+
+		// Update container with remote execution results
+		container.DockerID = updatedContainer.DockerID
+		container.Status = updatedContainer.Status
+		container.StartedAt = updatedContainer.StartedAt
+		container.LastHeartbeat = updatedContainer.LastHeartbeat
+
+		fmt.Printf("✅ Container %s started on remote node %s\n", container.Name, node.Hostname)
+		return dm.storage.SaveContainer(container)
 	}
 }
 
@@ -516,4 +531,123 @@ func (dm *DeploymentManager) updateDeploymentStatus(deploymentID string) error {
 
 	deployment.UpdatedAt = time.Now()
 	return dm.storage.SaveDeployment(deployment)
+}
+
+// StartContainerLocally starts a container on the local node (used by API)
+func (dm *DeploymentManager) StartContainerLocally(container *types.Container, deployment *types.DeploymentSpec) (string, error) {
+	if dm.dockerClient == nil {
+		return "", fmt.Errorf("Docker client not available - Docker daemon may not be running")
+	}
+
+	fmt.Printf("📦 Pulling image %s...\n", deployment.Image)
+	// Pull image if needed
+	if err := dm.dockerClient.PullImage(deployment.Image); err != nil {
+		fmt.Printf("⚠️  Failed to pull image %s: %v\n", deployment.Image, err)
+		fmt.Printf("   Continuing with local image (if available)...\n")
+		// Continue anyway - image might already exist locally
+	} else {
+		fmt.Printf("✅ Image %s pulled successfully\n", deployment.Image)
+	}
+
+	// Prepare container configuration
+	dockerConfig := &docker.ContainerConfig{
+		Image:         deployment.Image,
+		Name:          container.Name,
+		Ports:         dm.convertPortMappingsFromDeployment(deployment.Ports),
+		Environment:   dm.convertEnvironmentMap(deployment.Environment),
+		Volumes:       dm.convertVolumeMappingsFromDeployment(deployment.Volumes),
+		Entrypoint:    deployment.Entrypoint,
+		Cmd:           deployment.Command,
+		RestartPolicy: deployment.RestartPolicy,
+	}
+
+	fmt.Printf("🚀 Starting container %s...\n", container.Name)
+	// Start the container
+	dockerContainerID, err := dm.dockerClient.RunContainer(dockerConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to start Docker container: %w", err)
+	}
+	fmt.Printf("✅ Container %s started with ID: %s\n", container.Name, dockerContainerID[:12])
+
+	return dockerContainerID, nil
+}
+
+// Helper methods for deployment spec
+func (dm *DeploymentManager) convertPortMappingsFromDeployment(ports []types.PortMapping) []string {
+	var portStrings []string
+	for _, port := range ports {
+		if port.HostPort > 0 {
+			portStrings = append(portStrings, strconv.Itoa(port.HostPort)+":"+strconv.Itoa(port.ContainerPort))
+		} else {
+			portStrings = append(portStrings, strconv.Itoa(port.ContainerPort))
+		}
+	}
+	return portStrings
+}
+
+func (dm *DeploymentManager) convertVolumeMappingsFromDeployment(volumes []types.VolumeMapping) []string {
+	var volumeStrings []string
+	for _, volume := range volumes {
+		volumeStr := volume.HostPath + ":" + volume.ContainerPath
+		if volume.ReadOnly {
+			volumeStr += ":ro"
+		}
+		volumeStrings = append(volumeStrings, volumeStr)
+	}
+	return volumeStrings
+}
+
+// startContainerOnRemoteNode starts a container on a remote node via HTTP API
+func (dm *DeploymentManager) startContainerOnRemoteNode(container *types.Container, deployment *types.Deployment, node *types.Node) (*types.Container, error) {
+	// Convert deployment to deployment spec
+	deploymentSpec := &types.DeploymentSpec{
+		Name:          deployment.Name,
+		Image:         deployment.Image,
+		Command:       deployment.Command,
+		Entrypoint:    deployment.Entrypoint,
+		Environment:   deployment.Environment,
+		Ports:         container.Ports, // Use container's specific port mappings
+		Volumes:       deployment.Volumes,
+		RestartPolicy: deployment.RestartPolicy,
+	}
+
+	// Prepare API request
+	request := map[string]interface{}{
+		"container":       container,
+		"deployment_spec": deploymentSpec,
+	}
+
+	requestBody, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Make API call to remote node
+	url := fmt.Sprintf("http://%s:%d/api/v1/containers", node.IPAddress, node.Port)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to remote node API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse response
+	var apiResponse struct {
+		Success bool             `json:"success"`
+		Data    *types.Container `json:"data,omitempty"`
+		Error   string           `json:"error,omitempty"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !apiResponse.Success {
+		return nil, fmt.Errorf("remote API error: %s", apiResponse.Error)
+	}
+
+	if apiResponse.Data == nil {
+		return nil, fmt.Errorf("remote API returned no container data")
+	}
+
+	return apiResponse.Data, nil
 }

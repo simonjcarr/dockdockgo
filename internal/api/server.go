@@ -60,6 +60,11 @@ type ClusterJoinResponse struct {
 	ClusterNodes int    `json:"cluster_nodes"`
 }
 
+type ContainerCreateRequest struct {
+	Container      *types.Container      `json:"container"`
+	DeploymentSpec *types.DeploymentSpec `json:"deployment_spec"`
+}
+
 func NewServer(host, port string) *Server {
 	storage, err := storage.NewDefaultStorage()
 	if err != nil {
@@ -190,10 +195,48 @@ func (s *Server) initializeSyncManager() error {
 func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		s.sendJSON(w, Response{Success: true, Data: []string{"container1", "container2"}})
+		containers, err := s.storage.ListContainers()
+		if err != nil {
+			s.sendError(w, fmt.Sprintf("Failed to list containers: %v", err), http.StatusInternalServerError)
+			return
+		}
+		s.sendJSON(w, Response{Success: true, Data: containers})
 	case "POST":
-		s.sendJSON(w, Response{Success: true, Data: "Container created"})
+		s.handleCreateContainer(w, r)
 	}
+}
+
+func (s *Server) handleCreateContainer(w http.ResponseWriter, r *http.Request) {
+	var req ContainerCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.sendError(w, "Invalid request format", http.StatusBadRequest)
+		return
+	}
+
+	// Create deployment manager to handle container creation
+	deploymentManager := s.getDeploymentManager()
+
+	// Create container using the deployment manager's Docker client
+	dockerContainerID, err := deploymentManager.StartContainerLocally(req.Container, req.DeploymentSpec)
+	if err != nil {
+		s.sendError(w, fmt.Sprintf("Failed to start container: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Update container with Docker ID and status
+	req.Container.DockerID = dockerContainerID
+	req.Container.Status = types.ContainerRunning
+	now := time.Now()
+	req.Container.StartedAt = &now
+	req.Container.LastHeartbeat = now
+
+	// Save container to storage
+	if err := s.storage.SaveContainer(req.Container); err != nil {
+		s.sendError(w, fmt.Sprintf("Failed to save container: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	s.sendJSON(w, Response{Success: true, Data: req.Container})
 }
 
 func (s *Server) handleContainer(w http.ResponseWriter, r *http.Request) {

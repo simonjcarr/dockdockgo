@@ -1,6 +1,7 @@
 package dockdockgo
 
 import (
+	"dockdockgo/internal/api"
 	"dockdockgo/internal/cluster"
 	"dockdockgo/internal/storage"
 	"dockdockgo/pkg/types"
@@ -69,7 +70,24 @@ var deployCreateCmd = &cobra.Command{
 			RestartPolicy: restartPolicy,
 		}
 
-		// Initialize storage and deployment manager
+		// Try API first, fallback to direct storage access
+		client := api.NewClient("localhost", "8080")
+		if client.IsServiceRunning() {
+			// Use API
+			deployment, err := client.CreateDeployment(spec)
+			if err != nil {
+				fmt.Printf("Failed to create deployment via API: %v\n", err)
+				return
+			}
+			fmt.Printf("✓ Deployment %s created successfully via API\n", deployment.Name)
+			fmt.Printf("  ID: %s\n", deployment.ID)
+			fmt.Printf("  Image: %s\n", deployment.Image)
+			fmt.Printf("  Replicas: %d\n", deployment.Replicas)
+			fmt.Printf("  Status: %s\n", deployment.Status)
+			return
+		}
+
+		// Fallback to direct storage access
 		storage, err := storage.NewDefaultStorage()
 		if err != nil {
 			fmt.Printf("Failed to initialize storage: %v\n", err)
@@ -99,19 +117,34 @@ var deployListCmd = &cobra.Command{
 	Short: "List deployments",
 	Long:  `List all deployments in the cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		storage, err := storage.NewDefaultStorage()
-		if err != nil {
-			fmt.Printf("Failed to initialize storage: %v\n", err)
-			return
-		}
-		defer storage.Close()
+		// Try API first, fallback to direct storage access
+		client := api.NewClient("localhost", "8080")
+		var deployments []*types.Deployment
+		var err error
 
-		deploymentManager := cluster.NewDeploymentManager(storage)
+		if client.IsServiceRunning() {
+			// Use API
+			deployments, err = client.ListDeployments()
+			if err != nil {
+				fmt.Printf("Failed to list deployments via API: %v\n", err)
+				return
+			}
+		} else {
+			// Fallback to direct storage access
+			storage, err := storage.NewDefaultStorage()
+			if err != nil {
+				fmt.Printf("Failed to initialize storage: %v\n", err)
+				return
+			}
+			defer storage.Close()
 
-		deployments, err := deploymentManager.ListDeployments()
-		if err != nil {
-			fmt.Printf("Failed to list deployments: %v\n", err)
-			return
+			deploymentManager := cluster.NewDeploymentManager(storage)
+
+			deployments, err = deploymentManager.ListDeployments()
+			if err != nil {
+				fmt.Printf("Failed to list deployments: %v\n", err)
+				return
+			}
 		}
 
 		if len(deployments) == 0 {

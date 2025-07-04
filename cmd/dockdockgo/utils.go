@@ -7,8 +7,8 @@ import (
 )
 
 // getAPIEndpoint returns the API host and port to connect to
-// First tries environment variables, then tries to discover master node,
-// finally falls back to localhost
+// First tries environment variables, then falls back to localhost
+// Note: Removed database lookup to prevent hanging during command initialization
 func getAPIEndpoint() (string, string) {
 	// Check environment variables first
 	if host := os.Getenv("DOCKDOCKGO_MASTER_HOST"); host != "" {
@@ -19,12 +19,7 @@ func getAPIEndpoint() (string, string) {
 		return host, port
 	}
 
-	// Try to discover master node from local storage
-	if masterHost := discoverMasterNode(); masterHost != "" {
-		return masterHost, "8080"
-	}
-
-	// Fallback to localhost
+	// Fallback to localhost (removed database lookup to prevent hanging)
 	return "localhost", "8080"
 }
 

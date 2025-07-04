@@ -23,6 +23,13 @@ func NewDeploymentManager(storage *storage.Storage) *DeploymentManager {
 	if err != nil {
 		// Log error but continue - we'll handle this when scheduling containers
 		fmt.Printf("Warning: Failed to create Docker client: %v\n", err)
+		fmt.Printf("Docker daemon may not be running or accessible.\n")
+	} else {
+		// Test Docker connection
+		if err := dockerClient.Ping(); err != nil {
+			fmt.Printf("Warning: Docker ping failed: %v\n", err)
+			fmt.Printf("Docker daemon may not be responding correctly.\n")
+		}
 	}
 
 	return &DeploymentManager{
@@ -226,13 +233,15 @@ func (dm *DeploymentManager) scheduleContainers(deployment *types.Deployment, co
 
 		// Start the container
 		if err := dm.startContainer(container, deployment, node); err != nil {
-			fmt.Printf("Warning: Failed to start container %s: %v\n", container.Name, err)
+			fmt.Printf("❌ Failed to start container %s: %v\n", container.Name, err)
 			container.Status = types.ContainerFailed
 			dm.storage.SaveContainer(container)
-			continue
+			
+			// Return error on first failure to provide immediate feedback
+			return fmt.Errorf("failed to start container %s: %w", container.Name, err)
 		}
 
-		fmt.Printf("Successfully started container %s on node %s\n", container.Name, node.Hostname)
+		fmt.Printf("✅ Successfully started container %s on node %s\n", container.Name, node.Hostname)
 	}
 
 	return nil
@@ -387,13 +396,17 @@ func (dm *DeploymentManager) startContainer(container *types.Container, deployme
 	// Start container if it's on the local node
 	if node.Hostname == currentHostname {
 		if dm.dockerClient == nil {
-			return fmt.Errorf("Docker client not available")
+			return fmt.Errorf("Docker client not available - Docker daemon may not be running")
 		}
 
+		fmt.Printf("📦 Pulling image %s...\n", deployment.Image)
 		// Pull image if needed
 		if err := dm.dockerClient.PullImage(deployment.Image); err != nil {
-			fmt.Printf("Warning: Failed to pull image %s: %v\n", deployment.Image, err)
+			fmt.Printf("⚠️  Failed to pull image %s: %v\n", deployment.Image, err)
+			fmt.Printf("   Continuing with local image (if available)...\n")
 			// Continue anyway - image might already exist locally
+		} else {
+			fmt.Printf("✅ Image %s pulled successfully\n", deployment.Image)
 		}
 
 		// Prepare container configuration
@@ -408,11 +421,13 @@ func (dm *DeploymentManager) startContainer(container *types.Container, deployme
 			RestartPolicy: deployment.RestartPolicy,
 		}
 
+		fmt.Printf("🚀 Starting container %s...\n", container.Name)
 		// Start the container
 		dockerContainerID, err := dm.dockerClient.RunContainer(dockerConfig)
 		if err != nil {
 			return fmt.Errorf("failed to start Docker container: %w", err)
 		}
+		fmt.Printf("✅ Container %s started with ID: %s\n", container.Name, dockerContainerID[:12])
 
 		// Update container with Docker container ID and running status
 		container.DockerID = dockerContainerID

@@ -258,6 +258,24 @@ var deployStatusCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 
+		// Try API first, fallback to direct storage access
+		apiHost, apiPort := getAPIEndpoint()
+		client := api.NewClient(apiHost, apiPort)
+
+		if client.IsServiceRunning() {
+			// Use API for status
+			deployment, err := client.GetDeploymentByName(name)
+			if err != nil {
+				fmt.Printf("Deployment %s not found via API: %v\n", name, err)
+				return
+			}
+
+			// Display deployment info via API
+			displayDeploymentStatus(deployment)
+			return
+		}
+
+		// Fallback to direct storage access
 		storage, err := storage.NewDefaultStorage()
 		if err != nil {
 			fmt.Printf("Failed to initialize storage: %v\n", err)
@@ -422,6 +440,34 @@ func parsePlacement(placement string) (*types.PlacementConfig, error) {
 	}
 
 	return config, nil
+}
+
+func displayDeploymentStatus(deployment *types.Deployment) {
+	// Display deployment info
+	fmt.Printf("Deployment: %s\n", deployment.Name)
+	fmt.Printf("ID: %s\n", deployment.ID)
+	fmt.Printf("Image: %s\n", deployment.Image)
+	fmt.Printf("Status: %s\n", deployment.Status)
+	fmt.Printf("Replicas: %d\n", deployment.Replicas)
+	fmt.Printf("Created: %s\n", deployment.CreatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Printf("Updated: %s\n", deployment.UpdatedAt.Format("2006-01-02 15:04:05"))
+
+	if len(deployment.Ports) > 0 {
+		fmt.Printf("Ports:\n")
+		for _, port := range deployment.Ports {
+			fmt.Printf("  %d:%d/%s\n", port.HostPort, port.ContainerPort, port.Protocol)
+		}
+	}
+
+	if len(deployment.Environment) > 0 {
+		fmt.Printf("Environment:\n")
+		for key, value := range deployment.Environment {
+			fmt.Printf("  %s=%s\n", key, value)
+		}
+	}
+
+	fmt.Printf("\nNote: Container details require direct database access.\n")
+	fmt.Printf("Use API or check with 'docker ps' for running containers.\n")
 }
 
 func init() {

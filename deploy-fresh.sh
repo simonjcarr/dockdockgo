@@ -93,8 +93,7 @@ uninstall_current() {
     fi
     
     # Remove directories
-    local dirs=("$DATA_DIR" "$CONFIG_DIR" "$LOG_DIR")
-    for dir in "${dirs[@]}"; do
+    for dir in "$DATA_DIR" "$CONFIG_DIR" "$LOG_DIR"; do
         if [ -d "$dir" ]; then
             log_info "Removing directory: $dir"
             rm -rf "$dir"
@@ -184,8 +183,7 @@ download_and_install() {
     fi
     
     # Create directories
-    local dirs=("$DATA_DIR" "$CONFIG_DIR" "$LOG_DIR")
-    for dir in "${dirs[@]}"; do
+    for dir in "$DATA_DIR" "$CONFIG_DIR" "$LOG_DIR"; do
         mkdir -p "$dir"
         chown "$BINARY_NAME:$BINARY_NAME" "$dir"
     done

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"dockdockgo/internal/cluster"
 	"dockdockgo/internal/storage"
 	"dockdockgo/pkg/types"
@@ -11,6 +12,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,6 +25,7 @@ type Server struct {
 	port    string
 	host    string
 	storage *storage.Storage
+	server  *http.Server
 }
 
 type Response struct {
@@ -83,20 +87,56 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/nodes/register", s.handleNodeRegister).Methods("POST")
 	api.HandleFunc("/cluster/init", s.handleClusterInit).Methods("POST")
 	api.HandleFunc("/cluster/join", s.handleClusterJoin).Methods("POST")
+	api.HandleFunc("/cluster/sync", s.handleClusterSync).Methods("GET", "POST")
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
 }
 
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 	log.Printf("Starting API server on %s", addr)
-	return http.ListenAndServe(addr, s.router)
+	
+	// Create HTTP server
+	s.server = &http.Server{
+		Addr:    addr,
+		Handler: s.router,
+	}
+	
+	// Setup graceful shutdown
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan
+		
+		log.Println("Shutting down API server...")
+		
+		// Create a context with timeout for shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		
+		// Shutdown the server gracefully
+		if err := s.server.Shutdown(ctx); err != nil {
+			log.Printf("Error during server shutdown: %v", err)
+		}
+		
+		// Close database connection
+		if err := s.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+		
+		log.Println("API server stopped")
+	}()
+	
+	// Start the server
+	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("failed to start server: %w", err)
+	}
+	
+	return nil
 }
 
 func (s *Server) Close() error {
-	if s.storage != nil {
-		return s.storage.Close()
-	}
-	return nil
+	// Close the connection manager instead of individual storage
+	return storage.GetInstance().Close()
 }
 
 func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {
@@ -252,7 +292,7 @@ func (s *Server) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 	var thisNode *types.Node
 	if existingNode != nil {
 		// Update existing node
-		existingNode.Role = req.Role
+		existingNode.Role = types.NodeRole(req.Role)
 		existingNode.Status = types.NodeOnline
 		existingNode.LastHeartbeat = time.Now()
 		if err := s.storage.SaveNode(existingNode); err != nil {
@@ -287,7 +327,7 @@ func (s *Server) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 			IPAddress:     nodeIPAddress,
 			Port:          8443,
 			Status:        types.NodeOnline,
-			Role:          req.Role,
+			Role:          types.NodeRole(req.Role),
 			Version:       "1.0.0", // TODO: Get actual version
 			Labels:        map[string]string{"cluster.role": req.Role},
 			LastHeartbeat: time.Now(),
@@ -311,7 +351,7 @@ func (s *Server) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 
 	response := ClusterJoinResponse{
 		NodeID:       thisNode.ID,
-		Role:         thisNode.Role,
+		Role:         string(thisNode.Role),
 		Master:       req.MasterAddr,
 		ClusterNodes: len(finalNodes),
 	}
@@ -473,6 +513,12 @@ func (s *Server) sendJSON(w http.ResponseWriter, data interface{}) {
 	json.NewEncoder(w).Encode(data)
 }
 
+func (s *Server) sendError(w http.ResponseWriter, message string, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(Response{Success: false, Error: message})
+}
+
 // getLocalIPAddress returns the first non-loopback IP address
 func (s *Server) getLocalIPAddress() string {
 	addrs, err := net.InterfaceAddrs()
@@ -488,4 +534,86 @@ func (s *Server) getLocalIPAddress() string {
 		}
 	}
 	return ""
+}
+
+// handleClusterSync handles cluster state synchronization
+func (s *Server) handleClusterSync(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		s.handleGetClusterSync(w, r)
+	case "POST":
+		s.handlePostClusterSync(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleGetClusterSync returns current cluster state for synchronization
+func (s *Server) handleGetClusterSync(w http.ResponseWriter, r *http.Request) {
+	// Get current cluster state
+	deployments, err := s.storage.ListDeployments()
+	if err != nil {
+		s.sendError(w, fmt.Sprintf("Failed to get deployments: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	containers, err := s.storage.ListContainers()
+	if err != nil {
+		s.sendError(w, fmt.Sprintf("Failed to get containers: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	nodes, err := s.storage.ListNodes()
+	if err != nil {
+		s.sendError(w, fmt.Sprintf("Failed to get nodes: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	syncData := map[string]interface{}{
+		"timestamp":   time.Now(),
+		"deployments": deployments,
+		"containers":  containers,
+		"nodes":       nodes,
+	}
+
+	s.sendJSON(w, Response{Success: true, Data: syncData})
+}
+
+// handlePostClusterSync receives and applies cluster state from master
+func (s *Server) handlePostClusterSync(w http.ResponseWriter, r *http.Request) {
+	var syncData struct {
+		Timestamp   time.Time           `json:"timestamp"`
+		Deployments []*types.Deployment `json:"deployments"`
+		Containers  []*types.Container  `json:"containers"`
+		Nodes       []*types.Node       `json:"nodes"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&syncData); err != nil {
+		s.sendError(w, fmt.Sprintf("Failed to decode sync data: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Apply the sync data
+	for _, deployment := range syncData.Deployments {
+		if err := s.storage.SaveDeployment(deployment); err != nil {
+			log.Printf("Failed to save deployment %s: %v", deployment.Name, err)
+		}
+	}
+
+	for _, container := range syncData.Containers {
+		if err := s.storage.SaveContainer(container); err != nil {
+			log.Printf("Failed to save container %s: %v", container.Name, err)
+		}
+	}
+
+	for _, node := range syncData.Nodes {
+		if err := s.storage.SaveNode(node); err != nil {
+			log.Printf("Failed to save node %s: %v", node.Hostname, err)
+		}
+	}
+
+	log.Printf("Applied sync data with %d deployments, %d containers, %d nodes", 
+		len(syncData.Deployments), len(syncData.Containers), len(syncData.Nodes))
+
+	s.sendJSON(w, Response{Success: true, Data: "Sync data applied successfully"})
 }

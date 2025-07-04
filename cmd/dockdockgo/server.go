@@ -61,7 +61,7 @@ var serverAddCmd = &cobra.Command{
 
 			if existingNode != nil {
 				// Update existing node
-				existingNode.Role = role
+				existingNode.Role = types.NodeRole(role)
 				existingNode.Port = port
 				existingNode.Labels = nodeLabels
 				existingNode.LastHeartbeat = time.Now()
@@ -84,7 +84,7 @@ var serverAddCmd = &cobra.Command{
 					IPAddress:     hostname, // TODO: Resolve IP address
 					Port:          port,
 					Status:        types.NodeOffline,
-					Role:          role,
+					Role: types.NodeRole(role),
 					Version:       "1.0.0", // TODO: Get actual version
 					Labels:        nodeLabels,
 					LastHeartbeat: time.Now(),
@@ -484,7 +484,7 @@ var clusterJoinCmd = &cobra.Command{
 		var thisNode *types.Node
 		if existingNode != nil {
 			// Update existing node
-			existingNode.Role = role
+			existingNode.Role = types.NodeRole(role)
 			existingNode.Status = types.NodeOnline
 			existingNode.LastHeartbeat = time.Now()
 			if err := storage.SaveNode(existingNode); err != nil {
@@ -515,7 +515,7 @@ var clusterJoinCmd = &cobra.Command{
 				IPAddress:     hostname, // TODO: Get actual IP
 				Port:          8443,
 				Status:        types.NodeOnline,
-				Role:          role,
+				Role: types.NodeRole(role),
 				Version:       "1.0.0", // TODO: Get actual version
 				Labels:        map[string]string{"cluster.role": role},
 				LastHeartbeat: time.Now(),

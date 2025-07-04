@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -154,10 +155,16 @@ func (s *Server) handleClusterInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use advertise-addr or hostname as IP
+	// Use advertise-addr or auto-detect IP address
 	ipAddress := req.AdvertiseAddr
 	if ipAddress == "" {
-		ipAddress = hostname
+		// Try to get actual IP address instead of hostname
+		if detectedIP := s.getLocalIPAddress(); detectedIP != "" {
+			ipAddress = detectedIP
+		} else {
+			// Fallback to hostname if IP detection fails
+			ipAddress = hostname
+		}
 	}
 
 	// Check if cluster already exists
@@ -269,10 +276,15 @@ func (s *Server) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create this node and add it to the cluster
+		nodeIPAddress := hostname
+		if detectedIP := s.getLocalIPAddress(); detectedIP != "" {
+			nodeIPAddress = detectedIP
+		}
+		
 		thisNode = &types.Node{
 			ID:            uuid.New().String(),
 			Hostname:      hostname,
-			IPAddress:     hostname, // TODO: Get actual IP
+			IPAddress:     nodeIPAddress,
 			Port:          8443,
 			Status:        types.NodeOnline,
 			Role:          req.Role,
@@ -309,7 +321,8 @@ func (s *Server) handleClusterJoin(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) fetchClusterStateFromMaster(masterAddr string) ([]*types.Node, error) {
 	// Try to fetch cluster state from master node's API
-	url := fmt.Sprintf("http://%s:8080/api/v1/nodes", masterAddr)
+	// Use the same port as our server is running on
+	url := fmt.Sprintf("http://%s:%s/api/v1/nodes", masterAddr, s.port)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -376,7 +389,7 @@ func (s *Server) handleNodeRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) registerWithMaster(masterAddr string, node *types.Node) error {
-	url := fmt.Sprintf("http://%s:8080/api/v1/nodes/register", masterAddr)
+	url := fmt.Sprintf("http://%s:%s/api/v1/nodes/register", masterAddr, s.port)
 
 	nodeData, err := json.Marshal(node)
 	if err != nil {
@@ -458,4 +471,21 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 func (s *Server) sendJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(data)
+}
+
+// getLocalIPAddress returns the first non-loopback IP address
+func (s *Server) getLocalIPAddress() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
 }

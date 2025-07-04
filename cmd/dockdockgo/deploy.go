@@ -71,7 +71,8 @@ var deployCreateCmd = &cobra.Command{
 		}
 
 		// Try API first, fallback to direct storage access
-		client := api.NewClient("localhost", "8080")
+		apiHost, apiPort := getAPIEndpoint()
+		client := api.NewClient(apiHost, apiPort)
 		if client.IsServiceRunning() {
 			// Use API
 			deployment, err := client.CreateDeployment(spec)
@@ -118,7 +119,8 @@ var deployListCmd = &cobra.Command{
 	Long:  `List all deployments in the cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Try API first, fallback to direct storage access
-		client := api.NewClient("localhost", "8080")
+		apiHost, apiPort := getAPIEndpoint()
+		client := api.NewClient(apiHost, apiPort)
 		var deployments []*types.Deployment
 		var err error
 

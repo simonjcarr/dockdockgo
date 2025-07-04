@@ -140,13 +140,35 @@ get_latest_version() {
     echo "$latest_version"
 }
 
+get_arch() {
+    local arch
+    case "$(uname -m)" in
+        x86_64)
+            arch="amd64"
+            ;;
+        aarch64|arm64)
+            arch="arm64"
+            ;;
+        armv7l)
+            arch="arm"
+            ;;
+        *)
+            log_error "Unsupported architecture: $(uname -m)"
+            exit 1
+            ;;
+    esac
+    echo "$arch"
+}
+
 download_and_install() {
     local version="$1"
-    local arch="amd64"
+    local arch
+    arch=$(get_arch)
     local download_url="https://github.com/$GITHUB_REPO/releases/download/$version/dockdockgo-linux-$arch.tar.gz"
     local temp_dir=$(mktemp -d)
     local archive_file="$temp_dir/dockdockgo.tar.gz"
     
+    log_info "Detected architecture: $arch"
     log_info "Downloading DockDockGo $version..."
     
     if ! curl -L -o "$archive_file" "$download_url"; then

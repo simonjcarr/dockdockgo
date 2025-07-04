@@ -227,13 +227,27 @@ var deployDeleteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 
-		storage, err := storage.NewDefaultStorage()
+		client, storage, err := getStorageOrAPI()
 		if err != nil {
-			fmt.Printf("Failed to initialize storage: %v\n", err)
+			fmt.Printf("Failed to initialize storage/API: %v\n", err)
 			return
 		}
+		
+		// Use API if available
+		if client != nil {
+			if err := client.DeleteDeployment(name); err != nil {
+				fmt.Printf("Failed to delete deployment via API: %v\n", err)
+				return
+			}
+			fmt.Printf("✓ Deployment %s deleted successfully via API\n", name)
+			
+			// Trigger cluster sync
+			triggerClusterSync(client)
+			return
+		}
+		
+		// Fallback to direct storage access
 		defer storage.Close()
-
 		deploymentManager := cluster.NewDeploymentManager(storage)
 
 		// Get deployment by name
@@ -492,9 +506,19 @@ func init() {
 
 // triggerClusterSync triggers cluster synchronization after deployment changes
 func triggerClusterSync(client *api.Client) {
-	// For now, just log that sync should happen
-	// In a full implementation, this would trigger immediate sync
 	fmt.Println("  → Triggering cluster synchronization...")
+	
+	if client == nil {
+		fmt.Println("  ⚠️  Cannot sync - API client not available")
+		return
+	}
+	
+	if err := client.TriggerClusterSync(); err != nil {
+		fmt.Printf("  ⚠️  Cluster sync failed: %v\n", err)
+		return
+	}
+	
+	fmt.Println("  ✅ Cluster sync triggered successfully")
 }
 
 // cleanupFailedDeployment removes a failed deployment from the database
@@ -527,4 +551,26 @@ func cleanupFailedDeployment(name string) error {
 
 	fmt.Printf("✓ Cleaned up failed deployment: %s\n", name)
 	return nil
+}
+
+// getStorageOrAPI returns either an API client or storage instance, preferring API
+func getStorageOrAPI() (client *api.Client, storage *storage.Storage, err error) {
+	// Try API first
+	client = api.NewClient("http://localhost:8080")
+	
+	// Test if API is available by calling health endpoint  
+	_, err = client.ListDeployments()
+	if err == nil {
+		// API is working
+		return client, nil, nil
+	}
+	
+	// API not available, fall back to direct storage
+	fmt.Println("  ⚠️  API server not running, using direct database access")
+	storage, err = storage.NewDefaultStorage()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize storage: %w", err)
+	}
+	
+	return nil, storage, nil
 }

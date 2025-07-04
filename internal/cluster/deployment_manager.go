@@ -87,8 +87,10 @@ func (dm *DeploymentManager) CreateDeployment(spec *types.DeploymentSpec) (*type
 		return nil, fmt.Errorf("failed to schedule containers: %w", err)
 	}
 
-	deployment.Status = types.DeploymentRunning
-	dm.storage.SaveDeployment(deployment)
+	// Update deployment status based on actual container states
+	if err := dm.updateDeploymentStatus(deployment.ID); err != nil {
+		fmt.Printf("⚠️  Failed to update deployment status: %v\n", err)
+	}
 
 	return deployment, nil
 }
@@ -439,10 +441,12 @@ func (dm *DeploymentManager) startContainer(container *types.Container, deployme
 		return dm.storage.SaveContainer(container)
 	} else {
 		// TODO: Send container start command to worker node via gRPC
-		fmt.Printf("TODO: Start container %s on remote node %s\n", container.Name, node.Hostname)
-		// For now, mark as failed since we can't start on remote nodes
+		fmt.Printf("❌ Cannot start container %s on remote node %s (remote execution not implemented)\n", container.Name, node.Hostname)
+		// Mark as failed since we can't start on remote nodes
 		container.Status = types.ContainerFailed
-		return dm.storage.SaveContainer(container)
+		dm.storage.SaveContainer(container)
+		// Return error to prevent deployment from being marked as running
+		return fmt.Errorf("remote container execution not implemented for node %s", node.Hostname)
 	}
 }
 
@@ -499,13 +503,13 @@ func (dm *DeploymentManager) updateDeploymentStatus(deploymentID string) error {
 		}
 	}
 
-	// Determine deployment status
+	// Determine deployment status based on container states
 	if runningCount == deployment.Replicas {
 		deployment.Status = types.DeploymentRunning
-	} else if runningCount > 0 {
-		deployment.Status = types.DeploymentRunning // Partially running
-	} else if failedCount > 0 {
+	} else if failedCount > 0 && runningCount == 0 {
 		deployment.Status = types.DeploymentFailed
+	} else if runningCount > 0 {
+		deployment.Status = types.DeploymentRunning // Partially running but still operational
 	} else {
 		deployment.Status = types.DeploymentPending
 	}

@@ -111,6 +111,29 @@ func (c *Client) ClusterJoin(masterAddr, role string) (*ClusterJoinResponse, err
 	return &joinResponse, nil
 }
 
+func (c *Client) TriggerClusterSync() error {
+	resp, err := c.httpClient.Post(c.baseURL+"/cluster/sync", "application/json", nil)
+	if err != nil {
+		return fmt.Errorf("failed to connect to API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("sync request failed with status %d", resp.StatusCode)
+	}
+
+	var response Response
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("sync failed: %s", response.Error)
+	}
+
+	return nil
+}
+
 func (c *Client) ListNodes() ([]*types.Node, error) {
 	resp, err := c.httpClient.Get(c.baseURL + "/nodes")
 	if err != nil {

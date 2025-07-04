@@ -232,7 +232,7 @@ var deployDeleteCmd = &cobra.Command{
 			fmt.Printf("Failed to initialize storage/API: %v\n", err)
 			return
 		}
-		
+
 		// Use API if available
 		if client != nil {
 			if err := client.DeleteDeployment(name); err != nil {
@@ -240,12 +240,12 @@ var deployDeleteCmd = &cobra.Command{
 				return
 			}
 			fmt.Printf("✓ Deployment %s deleted successfully via API\n", name)
-			
+
 			// Trigger cluster sync
 			triggerClusterSync(client)
 			return
 		}
-		
+
 		// Fallback to direct storage access
 		defer storage.Close()
 		deploymentManager := cluster.NewDeploymentManager(storage)
@@ -507,17 +507,17 @@ func init() {
 // triggerClusterSync triggers cluster synchronization after deployment changes
 func triggerClusterSync(client *api.Client) {
 	fmt.Println("  → Triggering cluster synchronization...")
-	
+
 	if client == nil {
 		fmt.Println("  ⚠️  Cannot sync - API client not available")
 		return
 	}
-	
+
 	if err := client.TriggerClusterSync(); err != nil {
 		fmt.Printf("  ⚠️  Cluster sync failed: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("  ✅ Cluster sync triggered successfully")
 }
 
@@ -554,23 +554,23 @@ func cleanupFailedDeployment(name string) error {
 }
 
 // getStorageOrAPI returns either an API client or storage instance, preferring API
-func getStorageOrAPI() (client *api.Client, storage *storage.Storage, err error) {
+func getStorageOrAPI() (client *api.Client, storageInst *storage.Storage, err error) {
 	// Try API first
-	client = api.NewClient("http://localhost:8080")
-	
-	// Test if API is available by calling health endpoint  
+	client = api.NewClient("localhost", "8080")
+
+	// Test if API is available by calling health endpoint
 	_, err = client.ListDeployments()
 	if err == nil {
 		// API is working
 		return client, nil, nil
 	}
-	
+
 	// API not available, fall back to direct storage
 	fmt.Println("  ⚠️  API server not running, using direct database access")
-	storage, err = storage.NewDefaultStorage()
+	storageInst, err = storage.NewDefaultStorage()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
-	
-	return nil, storage, nil
+
+	return nil, storageInst, nil
 }

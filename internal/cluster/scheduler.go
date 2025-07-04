@@ -70,7 +70,8 @@ func (s *Scheduler) getAvailableNodes() ([]*types.Node, error) {
 
 	var availableNodes []*types.Node
 	for _, node := range allNodes {
-		if node.Status == types.NodeOnline && node.Role == "worker" {
+		// Allow both master and worker nodes to run containers
+		if node.Status == types.NodeOnline && (node.Role == "worker" || node.Role == "master") {
 			availableNodes = append(availableNodes, node)
 		}
 	}

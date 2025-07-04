@@ -358,7 +358,7 @@ func (s *Server) handleNodeRegister(w http.ResponseWriter, r *http.Request) {
 		existingNode.IPAddress = node.IPAddress
 		existingNode.Port = node.Port
 		existingNode.LastHeartbeat = time.Now()
-		
+
 		if err := s.storage.SaveNode(existingNode); err != nil {
 			s.sendJSON(w, Response{Success: false, Error: fmt.Sprintf("Failed to update node: %v", err)})
 			return
@@ -377,7 +377,7 @@ func (s *Server) handleNodeRegister(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) registerWithMaster(masterAddr string, node *types.Node) error {
 	url := fmt.Sprintf("http://%s:8080/api/v1/nodes/register", masterAddr)
-	
+
 	nodeData, err := json.Marshal(node)
 	if err != nil {
 		return fmt.Errorf("failed to marshal node data: %w", err)

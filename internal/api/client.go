@@ -225,6 +225,21 @@ func (c *Client) GetDeployment(id string) (*types.Deployment, error) {
 	return &deployment, nil
 }
 
+func (c *Client) GetDeploymentByName(name string) (*types.Deployment, error) {
+	deployments, err := c.ListDeployments()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list deployments: %w", err)
+	}
+
+	for _, deployment := range deployments {
+		if deployment.Name == name {
+			return deployment, nil
+		}
+	}
+
+	return nil, fmt.Errorf("deployment with name %s not found", name)
+}
+
 func (c *Client) DeleteDeployment(id string) error {
 	req, err := http.NewRequest("DELETE", c.baseURL+"/deployments/"+id, nil)
 	if err != nil {

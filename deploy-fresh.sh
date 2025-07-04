@@ -41,16 +41,16 @@ log_error() {
 }
 
 check_root() {
-    if [[ $EUID -ne 0 ]]; then
+    if [ $EUID -ne 0 ]; then
         log_error "This script must be run as root (use sudo)"
         exit 1
     fi
 }
 
 check_dependencies() {
-    local deps=("curl" "tar" "systemctl")
-    for dep in "${deps[@]}"; do
-        if ! command -v "$dep" &> /dev/null; then
+    local deps="curl tar systemctl"
+    for dep in $deps; do
+        if ! command -v "$dep" >/dev/null 2>&1; then
             log_error "Required dependency '$dep' is not installed"
             exit 1
         fi
@@ -73,20 +73,20 @@ uninstall_current() {
     fi
     
     # Remove service file
-    if [[ -f "$SERVICE_FILE" ]]; then
+    if [ -f "$SERVICE_FILE" ]; then
         log_info "Removing systemd service file..."
         rm -f "$SERVICE_FILE"
         systemctl daemon-reload
     fi
     
     # Remove binary
-    if [[ -f "$INSTALL_DIR/$BINARY_NAME" ]]; then
+    if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
         log_info "Removing DockDockGo binary..."
         rm -f "$INSTALL_DIR/$BINARY_NAME"
     fi
     
     # Remove user
-    if id "$BINARY_NAME" &>/dev/null; then
+    if id "$BINARY_NAME" >/dev/null 2>&1; then
         log_info "Removing DockDockGo user..."
         pkill -u "$BINARY_NAME" 2>/dev/null || true
         userdel "$BINARY_NAME" 2>/dev/null || true
@@ -95,21 +95,21 @@ uninstall_current() {
     # Remove directories
     local dirs=("$DATA_DIR" "$CONFIG_DIR" "$LOG_DIR")
     for dir in "${dirs[@]}"; do
-        if [[ -d "$dir" ]]; then
+        if [ -d "$dir" ]; then
             log_info "Removing directory: $dir"
             rm -rf "$dir"
         fi
     done
     
     # Remove firewall rules if ufw is available
-    if command -v ufw &> /dev/null; then
+    if command -v ufw >/dev/null 2>&1; then
         log_info "Removing firewall rules..."
         ufw delete allow 8080/tcp 2>/dev/null || true
         ufw delete allow 8443/tcp 2>/dev/null || true
     fi
     
     # Remove uninstall script
-    if [[ -f "$UNINSTALL_SCRIPT" ]]; then
+    if [ -f "$UNINSTALL_SCRIPT" ]; then
         rm -f "$UNINSTALL_SCRIPT"
     fi
     
@@ -132,7 +132,7 @@ get_latest_version() {
     local latest_version
     latest_version=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases" | grep '"tag_name":' | head -1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
     
-    if [[ -z "$latest_version" ]]; then
+    if [ -z "$latest_version" ]; then
         log_error "Failed to get latest version from GitHub"
         exit 1
     fi
@@ -168,7 +168,7 @@ download_and_install() {
     local binary_path
     binary_path=$(find "$temp_dir" -name "$BINARY_NAME" -type f | head -1)
     
-    if [[ -z "$binary_path" ]]; then
+    if [ -z "$binary_path" ]; then
         log_error "Binary not found in archive"
         rm -rf "$temp_dir"
         exit 1
@@ -179,7 +179,7 @@ download_and_install() {
     chmod +x "$INSTALL_DIR/$BINARY_NAME"
     
     # Create user
-    if ! id "$BINARY_NAME" &>/dev/null; then
+    if ! id "$BINARY_NAME" >/dev/null 2>&1; then
         useradd --system --no-create-home --shell /bin/false "$BINARY_NAME"
     fi
     
@@ -225,13 +225,13 @@ EOF
     systemctl start dockdockgo
     
     # Copy uninstall script
-    if [[ -f "$temp_dir/uninstall.sh" ]]; then
+    if [ -f "$temp_dir/uninstall.sh" ]; then
         cp "$temp_dir/uninstall.sh" "$UNINSTALL_SCRIPT"
         chmod +x "$UNINSTALL_SCRIPT"
     fi
     
     # Configure firewall if ufw is available
-    if command -v ufw &> /dev/null; then
+    if command -v ufw >/dev/null 2>&1; then
         log_info "Configuring firewall..."
         ufw allow 8080/tcp 2>/dev/null || true
         ufw allow 8443/tcp 2>/dev/null || true
@@ -250,7 +250,7 @@ verify_installation() {
     sleep 3
     
     # Check if binary exists and is executable
-    if [[ ! -x "$INSTALL_DIR/$BINARY_NAME" ]]; then
+    if [ ! -x "$INSTALL_DIR/$BINARY_NAME" ]; then
         log_error "Binary not found or not executable"
         return 1
     fi

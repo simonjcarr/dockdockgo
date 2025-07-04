@@ -324,7 +324,8 @@ var clusterInitCmd = &cobra.Command{
 		advertiseAddr, _ := cmd.Flags().GetString("advertise-addr")
 
 		// Try API-first approach
-		client := api.NewClient(getAPIEndpoint())
+		host, port := getAPIEndpoint()
+		client := api.NewClient(host, port)
 		if client.IsServiceRunning() {
 			fmt.Printf("Using DockDockGo API service...\n")
 
@@ -425,7 +426,8 @@ var clusterJoinCmd = &cobra.Command{
 		fmt.Printf("Attempting to join cluster at %s...\n", masterAddr)
 
 		// Try API-first approach
-		client := api.NewClient(getAPIEndpoint())
+		host, port := getAPIEndpoint()
+		client := api.NewClient(host, port)
 		if client.IsServiceRunning() {
 			fmt.Printf("Using DockDockGo API service...\n")
 
